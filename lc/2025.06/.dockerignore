@@ -1,4 +1,0 @@
-# The base images already carry SynopsysInstaller_v5.10.run and
-# ValidationTool, so they are not part of this build context.
-SynopsysInstaller_v5.10.run
-ValidationTool

@@ -1,17 +1,8 @@
 #!/bin/sh
 # Start probe for Library Compiler, packaged at /opt/eda-smoke/smoke.sh.
-#
-# The Containerfile runs it as the last build step, so a tree that cannot
-# start never reaches the registry.  Re-run it against a finished image:
-#
+# Re-run against a finished image:
 #   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh \
 #       local.io/synopsys/lc:2025.06
-#
-# The shell is driven by the smoke.tcl below so the probe is the same Tcl
-# script for every Synopsys Tcl shell.  The tool writes command.log, a license
-# cache and GUI state into $HOME and the current directory, so it runs in a
-# throwaway tree; the build mounts /tmp and /root as tmpfs, so none of that
-# reaches an image layer.
 set -eu
 
 : "${SNPSLMD_LICENSE_FILE:=2700@license.synopsys.svc.cluster.local}"

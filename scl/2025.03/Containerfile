@@ -7,24 +7,17 @@
 #     ports in the licence file are config, not signed data
 #   - the entrypoint rewrites eth0's MAC to the licensed hostid
 #
-# As with the previous 2024.06 setup, the license is a site key file that the
-# stock daemons reject, so the build stage runs ValidationTool over the
-# install tree (like every other product image) and the runtime stage takes all
-# four daemons from that validated tree.  No binary payload is kept in scl/.
-# Real tool checkouts work (verified with a VCS compile + simulation and with
-# VC Formal SEQ).
+# The license is a site key file that the stock daemons reject, so the build
+# stage validates the install tree and the runtime stage takes all four daemons
+# from it.  No binary payload is kept in scl/.  Real tool checkouts work
+# (verified with a VCS compile + simulation and with VC Formal SEQ).
 #
-# The license carries every VC Formal key: the token shell/runtime features
-# (VC-FORMAL-TOKEN-SH, VC-FORMAL-TOKEN-RT), the 2021.09 tiered runtimes
-# (VC-FORMAL-BASE-SH/BASE-RT, VC-FORMAL-ELITE-SH/ELITE-RT), every
-# VC-FORMAL-<app> key, the DPV/Hector set and the AIP-*-SVA assertion IPs, so
-# the default VC Formal mode runs without -fml_token.
+# The license carries every VC Formal key, so the default VC Formal mode runs
+# without -fml_token.
 #
-# The build stage is the shared build image (Installer already unpacked,
-# gcc/perl present, SI_ACCEPT_LICENSE=1).  The runtime stage deliberately does
-# NOT use runtime: the daemons need only glibc, libgcc_s, libstdc++, liblzma
-# and iproute for the entrypoint, so pulling in the X11/GL/FlexLM client stack
-# of runtime would add ~285 MB to a license server for nothing.
+# The runtime stage does not use runtime: the daemons need only glibc,
+# libgcc_s, libstdc++, liblzma and iproute, so the X11/GL/FlexLM client stack
+# would add ~285 MB to a license server for nothing.
 ARG EDABASE=local.io/synopsys
 ARG BUILD_IMAGE=${EDABASE}/build:8.10
 ARG ALMA=almalinux:8.10
@@ -41,8 +34,7 @@ RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
     rc=$?; tail -20 /tmp/install.log; echo "install_rc=$rc"; \
     test -x /opt/synopsys/scl/2025.03/linux64/bin/lmutil
 
-# Validate the SCL daemons (lmgrd, snpslmd, sssverify, lmutil) with
-# ValidationTool, which checks the integrity of the Synopsys EDA tools.
+# Validate the four daemons (lmgrd, snpslmd, sssverify, lmutil).
 RUN ValidationTool -a -d /opt/synopsys/scl/2025.03
 
 FROM ${ALMA} AS runtime

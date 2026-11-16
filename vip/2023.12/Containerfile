@@ -4,19 +4,7 @@
 #
 # This is not a tool image: VIP is the read-only source/library tree that VCS
 # compiles against.  There is no entry point; mount the image as a Kubernetes
-# image volume at DESIGNWARE_HOME (or unpack it once for a hostPath mount):
-#
-#   volumes:
-#     - name: vip
-#       image:
-#         reference: local.io/synopsys/vip:2023.12
-#         pullPolicy: IfNotPresent
-#   containers:
-#     - name: vcs
-#       env:
-#         - { name: DESIGNWARE_HOME, value: /opt/designware }
-#       volumeMounts:
-#         - { name: vip, mountPath: /opt/designware, readOnly: true }
+# image volume at DESIGNWARE_HOME (or unpack it once for a hostPath mount).
 #
 # `vip_library19_svt` is the vendor's compile-time library: it carries
 # vip/common, vip/svt/common and the sverilog/src/vcs sources of every SVT
@@ -24,11 +12,6 @@
 # the only products it does not bundle, so they are installed on top.  The 57
 # remaining .run files (12 GB, mostly PDFs) are not needed to compile or
 # simulate; see README.md.
-#
-# Build (the payloads are bind-mounted, so they never become a layer):
-#   sudo nerdctl build --buildkit-host tcp://buildkitd.buildkit.svc.cluster.local:1234 \
-#     --output type=image,name=local.io/synopsys/vip:2023.12,push=true \
-#     -f vip/2023.12/Containerfile vip/2023.12/
 ARG EDABASE=local.io/synopsys
 ARG BUILD_IMAGE=${EDABASE}/build:8.10
 

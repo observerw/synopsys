@@ -1,5 +1,6 @@
 Containerfile
 .dockerignore
+smoke.sh
 fusioncompiler_vX-2025.06_common.spf.part00
 fusioncompiler_vX-2025.06_common.spf.part01
 fusioncompiler_vX-2025.06_common.spf.part02

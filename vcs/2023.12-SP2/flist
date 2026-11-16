@@ -1,5 +1,6 @@
 Containerfile
 .dockerignore
+smoke.sh
 vcs_vV-2023.12-SP2_common.spf
 vcs_vV-2023.12-SP2_linux64.spf.part00
 vcs_vV-2023.12-SP2_linux64.spf.part01

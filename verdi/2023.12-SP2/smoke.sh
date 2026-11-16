@@ -1,9 +1,6 @@
 #!/bin/sh
 # Start probe for Verdi, packaged at /opt/eda-smoke/smoke.sh.
-#
-# The Containerfile runs it as the last build step, so a tree that cannot
-# start never reaches the registry.  Re-run it against a finished image:
-#
+# Re-run against a finished image:
 #   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh \
 #       local.io/synopsys/verdi:2023.12-SP2
 #

@@ -1,5 +1,6 @@
 Containerfile
 .dockerignore
+smoke.sh
 prime_vX-2025.06_linux64.spf
 prime_vX-2025.06_common.spf.part00
 prime_vX-2025.06_common.spf.part01

@@ -13,7 +13,7 @@ It has no entry point and no license file.
 
 ## What is in it
 
-The full delivery is 59 `.run` files (12 GB compressed). Most of that is
+The full delivery is 60 `.run` files (12 GB compressed). Most of that is
 per-product `doc/` PDFs; the compile-time content is the vendor's
 `vip_library19_svt` bundle. We install three packages into one
 `DESIGNWARE_HOME`:

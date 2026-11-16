@@ -28,7 +28,7 @@ RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
  && dnf clean all
 
 # systemd-libs is what provides the /lib64/libudev.so.1 that every FlexLM-based
-# product preloads; it used to arrive only as a transitive dependency.
+# product preloads.
 RUN mkdir -p /opt/synopsys /work \
  && test -e /lib64/libudev.so.1
 

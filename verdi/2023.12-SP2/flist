@@ -1,5 +1,6 @@
 Containerfile
 .dockerignore
+smoke.sh
 verdi_vV-2023.12-SP2_common.spf
 verdi_vV-2023.12-SP2_linux64.spf.part00
 verdi_vV-2023.12-SP2_linux64.spf.part01

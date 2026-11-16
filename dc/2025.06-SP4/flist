@@ -1,5 +1,6 @@
 Containerfile
 .dockerignore
+smoke.sh
 syn_vX-2025.06-SP4_linux64.spf
 syn_vX-2025.06-SP4_common.spf.part00
 syn_vX-2025.06-SP4_common.spf.part01

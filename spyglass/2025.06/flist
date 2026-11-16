@@ -1,3 +1,4 @@
 Containerfile
 .dockerignore
+smoke.sh
 spyglass_vX-2025.06_common.spf

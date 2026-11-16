@@ -1,4 +1,4 @@
 Containerfile
-.dockerignore
+smoke.sh
 lc_vX-2025.06_common.spf
 lc_vX-2025.06_linux64.spf

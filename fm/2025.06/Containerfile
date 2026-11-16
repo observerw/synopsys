@@ -1,10 +1,6 @@
 # Synopsys Formality X-2025.06 (linux64), license checked out from a remote
 # SCL/FlexLM server.
 #
-# Both stages come from base/ (see base/Containerfile.build / .runtime):
-#   build:8.10   Synopsys Installer, ValidationTool, SI_ACCEPT_LICENSE=1
-#   runtime:8.10 X11/GL/libstdc++/FlexLM runtime libraries
-#
 # Its ELF tree needs nothing beyond runtime: every unmet soname left in the
 # installed tree belongs to the Qt GUI plugins and the bundled Python's optional
 # C extensions (icu 56, tcl/tk 8.5, ncursesw 5), none of which exist on el8 and
@@ -50,21 +46,12 @@ ENV SYNOPSYS=/opt/synopsys \
 # same workaround lc/2025.06/Containerfile documents at length.
 ENV LD_PRELOAD=/lib64/libudev.so.1
 
-# --- start probe ----------------------------------------------------------
-# Run the packaged probe as the last build step, so a tree that cannot start
-# never reaches the registry.  /tmp and /root are tmpfs for this step: the
-# tools keep their command logs and license cache there and none of that
-# belongs in the image.  Re-run the probe against the finished image with
-#   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh <image>
+# Start probe last; tmpfs /tmp and /root keep its logs out of the image.
 COPY smoke.sh /opt/eda-smoke/smoke.sh
 RUN --mount=type=tmpfs,target=/tmp \
     --mount=type=tmpfs,target=/root \
     chmod 0755 /opt/eda-smoke/smoke.sh \
  && /opt/eda-smoke/smoke.sh
 
-# The image entry point is the tool itself: a pod without a command, or
-# `nerdctl run -it <image>`, lands in the fm_shell prompt, and extra arguments
-# are passed straight through (`nerdctl run --rm <image> -f run.tcl`).  Use
-# `--entrypoint /bin/bash` (or `command: ["bash"]` in a pod) for a shell.
 WORKDIR /work
 ENTRYPOINT ["fm_shell"]

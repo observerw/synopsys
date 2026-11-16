@@ -1,5 +1,6 @@
 Containerfile
 .dockerignore
+smoke.sh
 vc_static_vX-2025.06-SP2_common.spf.part00
 vc_static_vX-2025.06-SP2_common.spf.part01
 vc_static_vX-2025.06-SP2_common.spf.part02

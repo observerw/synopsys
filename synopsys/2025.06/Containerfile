@@ -122,9 +122,8 @@ COPY --from=dc    /opt/synopsys/syn            /opt/synopsys/syn
 COPY --from=vcst  /opt/synopsys/vc_static      /opt/synopsys/vc_static
 
 # --- runtime packages ------------------------------------------------------
-# These used to be installed by the individual product images on top of
-# runtime, and this image copies only their trees, so their system packages
-# have to be provided here: perl for the VCS UVM/VIP setup helpers, and the
+# This image copies only the product trees, so their system packages have to
+# be provided here: perl for the VCS UVM/VIP setup helpers, and the
 # compiler toolchain for the VCS DPI/UVM flow and the VC Formal VCS reader; bc
 # and time provide the `dc` and `/usr/bin/time` that VCS and VC Formal shell out
 # to.  Keep this layer after the copies so a package change does not invalidate
