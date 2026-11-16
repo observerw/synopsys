@@ -1,0 +1,77 @@
+# syntax=docker/dockerfile:1
+#
+# Synopsys VIP V-2023.12 as a static file image.
+#
+# This is not a tool image: VIP is the read-only source/library tree that VCS
+# compiles against.  There is no entry point; mount the image as a Kubernetes
+# image volume at DESIGNWARE_HOME (or unpack it once for a hostPath mount):
+#
+#   volumes:
+#     - name: vip
+#       image:
+#         reference: local.io/synopsys/vip:2023.12
+#         pullPolicy: IfNotPresent
+#   containers:
+#     - name: vcs
+#       env:
+#         - { name: DESIGNWARE_HOME, value: /opt/designware }
+#       volumeMounts:
+#         - { name: vip, mountPath: /opt/designware, readOnly: true }
+#
+# `vip_library19_svt` is the vendor's compile-time library: it carries
+# vip/common, vip/svt/common and the sverilog/src/vcs sources of every SVT
+# product, but not the per-product doc/ trees.  ecpri_svt and memory_svt are
+# the only products it does not bundle, so they are installed on top.  The 57
+# remaining .run files (12 GB, mostly PDFs) are not needed to compile or
+# simulate; see README.md.
+#
+# Build (the payloads are bind-mounted, so they never become a layer):
+#   sudo nerdctl build --buildkit-host tcp://buildkitd.buildkit.svc.cluster.local:1234 \
+#     --output type=image,name=local.io/synopsys/vip:2023.12,push=true \
+#     -f vip/2023.12/Containerfile vip/2023.12/
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+# The .run installers are perl scripts; build already provides perl, tar,
+# gzip and cksum.  All packages share one DESIGNWARE_HOME: they contain the
+# same vip/common and vip/svt/common trees, and the `latest` links only make
+# sense across a single install root.  --no_overwrite skips the shared trees
+# for the two add-on packages; --no_latest defers the link generation to the
+# single dwh_install call at the end.
+RUN --mount=type=bind,source=.,target=/payload \
+    export DESIGNWARE_HOME=/opt/designware; \
+    { perl /payload/vip_library19_svt_V-2023.12.run --dir "$DESIGNWARE_HOME"; \
+      perl /payload/vip_ecpri_svt_V-2023.12.run --dir "$DESIGNWARE_HOME" \
+          --no_overwrite --no_latest; \
+      perl /payload/vip_memory_svt_V-2023.12.run --dir "$DESIGNWARE_HOME" \
+          --no_overwrite --no_latest; \
+      "$DESIGNWARE_HOME/bin/dwh_install"; } > /tmp/install.log 2>&1; \
+    rc=$?; tail -30 /tmp/install.log; echo "install_rc=$rc"; \
+    test "$rc" -eq 0 || exit 1; \
+    test -d "$DESIGNWARE_HOME/vip/svt/amba_svt/V-2023.12"; \
+    test -d "$DESIGNWARE_HOME/vip/svt/ecpri_svt/V-2023.12"; \
+    test -d "$DESIGNWARE_HOME/vip/svt/memory_svt/V-2023.12"; \
+    test -L "$DESIGNWARE_HOME/vip/svt/memory_svt/latest"; \
+    rm -f /tmp/install.log "$DESIGNWARE_HOME"/*.acp
+
+# The site license file fails Synopsys SSS integrity, and the VIP SLI helper
+# (vip/common/V-2023.12/C/lib/{linux64,suse64}/sliserv) rejects the key even
+# though snpslmd grants the feature.  Run ValidationTool, which validates the
+# integrity of the Synopsys EDA tools, over the installed tree; the AHB UVM
+# example then runs to completion.
+RUN ValidationTool -a -d /opt/designware
+
+# An image volume exposes the image's root filesystem, so the tree is placed at
+# the root: mounting the image at /opt/designware gives /opt/designware/vip/...
+# and makes DESIGNWARE_HOME=/opt/designware resolve the same way it would on a
+# host install.
+FROM scratch
+
+COPY --from=build /opt/designware/ /
+
+LABEL org.opencontainers.image.title="Synopsys VIP V-2023.12" \
+      org.opencontainers.image.description="Compile-time VIP tree for VCS/UVM: all SVT protocols plus common library and setup tools, ready to mount as a read-only image volume" \
+      org.opencontainers.image.version="V-2023.12" \
+      com.synopsys.vip.version="V-2023.12"

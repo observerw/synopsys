@@ -1,0 +1,10 @@
+# Only the linux64 volumes are installed; keep the other platforms and the docs
+# image out of the build context.  Older releases live in their own version
+# directory, so these globs only need to cover extra platforms dropped next to
+# the current delivery.
+vcs_*_linux.spf.part*
+vcs_*_aarch64.spf.part*
+vcs_docs_*.spf
+
+# The merged EST is rebuilt from the partNN volumes inside the build.
+vcs_*_linux64.spf

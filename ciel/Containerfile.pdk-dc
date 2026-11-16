@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1
+#
+# Same open PDK tree as Containerfile.pdk, plus Design Compiler .db views
+# compiled for the typical (TT) corner of every Liberty library:
+#
+#   /pdk/<variant>/libs.ref/<library>/lib/<name>.lib   (unchanged)
+#   /pdk/<variant>/libs.ref/<library>/db/<name>.db     (generated)
+#
+# Build context: <repo>/ciel/pdk-dc, produced by unpack_pdks.py followed by
+# compile_db.sh (see k8s/compile-db-job.yaml). The image is consumed as a
+# Kubernetes image volume, not run.
+#
+# The db/ directories contain 435 of the 443 typical-corner libraries. The
+# gf180mcu as_sc/ocd_sc standard cells are missing: LC X-2025.06 rejects their
+# Liberty (missing timing arcs / clear+preset flip-flops) and would not emit a
+# usable .db.
+
+FROM scratch
+
+ARG CIEL_VERSION
+
+COPY . /
+
+LABEL org.opencontainers.image.title="Open PDK root (CIEL) with DC .db views" \
+      org.opencontainers.image.description="Newest CIEL release of sky130, gf180mcu, ihp-sg13 and freepdk45 with typical-corner Design Compiler .db views" \
+      org.opencontainers.image.version="${CIEL_VERSION}" \
+      org.opencontainers.image.source="https://github.com/fossi-foundation/ciel" \
+      com.ciel.db.corner="tt" \
+      com.ciel.sky130.version="792ef67037d74c8c51811eab3ce23cf793491296" \
+      com.ciel.gf180mcu.version="792ef67037d74c8c51811eab3ce23cf793491296" \
+      com.ciel.ihp-sg13.version="89d42ee6d2fd9b50b86a1aada6fee6673c3e6008" \
+      com.ciel.freepdk45.version="784b1a483a5f4de362d6f3629378de1199453f3c"

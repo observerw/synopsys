@@ -1,0 +1,16 @@
+# The install RUN bind-mounts the whole context (source=.) and BuildKit keys
+# that layer on the mounted files.  Keep the text files out of that cache key:
+# without these lines every comment edit re-runs the ~3.6 GB install.  The
+# frontend still reads Containerfile and .dockerignore from the dockerfile
+# context; they are only hidden from the build context.
+Containerfile
+.dockerignore
+README.md
+flist
+
+# Only the three compile-time payloads are installed; keeping the other 56
+# .run files out of the context cuts the transfer from 12 GB to 1.8 GB.
+vip_*.run
+!vip_library19_svt_V-2023.12.run
+!vip_ecpri_svt_V-2023.12.run
+!vip_memory_svt_V-2023.12.run

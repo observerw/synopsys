@@ -1,0 +1,463 @@
+name: Build EDA images
+
+# Builds the Synopsys tool images with the cluster build service and pushes them
+# to the cluster registry as
+#
+#   local.io/synopsys/<product>:<version>
+#
+# e.g. local.io/synopsys/dc:2025.06-SP4.
+#
+# The vendor payloads are not in git; the job pods mount the cluster's /data2 and
+# build straight from the checkout, so the payloads have to be in place there.
+#
+# A push to main builds the images whose directory it touched (base/ rebuilds
+# the two bases and then every image that is built on them); the mapping lives
+# in .github/scripts/select-products.sh.  workflow_dispatch stays as the way to
+# rebuild an image whose sources did not change.
+#
+# Every tool Containerfile ends by running its packaged start probe
+# (<tool dir>/smoke.sh), so a rebuilt image whose tool cannot start fails the
+# build before it is pushed; the synopsys assembly then never sees it.
+#
+# synopsys/ is assembled from the product images instead of installing the
+# tools again, so it is not part of the tools matrix: it runs last, after
+# tools, vip and ciel, and copies their trees out of the registry.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/**"
+      - "base/**"
+      - "scl/**"
+      - "vcs/**"
+      - "verdi/**"
+      - "lc/**"
+      - "spyglass/**"
+      - "fm/**"
+      - "pt/**"
+      - "dc/**"
+      - "fc/**"
+      - "vcst/**"
+      - "synopsys/**"
+      - "ciel/**"
+      - "vip/**"
+  workflow_dispatch:
+    inputs:
+      product:
+        description: "Product to build (all = every image)"
+        type: choice
+        options:
+          - all
+          - base
+          - scl
+          - vcs
+          - verdi
+          - lc
+          - spyglass
+          - fm
+          - pt
+          - dc
+          - fc
+          - vcst
+          - synopsys
+          - ciel
+          - vip
+        default: all
+      allow_dirty:
+        description: "Build even if the checkout has uncommitted tracked changes"
+        type: boolean
+        default: false
+
+env:
+  # Inside a job pod local.io resolves to a public host, so push to the Service.
+  REGISTRY: distribution-local.local-registry.svc.cluster.local:5000
+  NAMESPACE: synopsys
+  BUILDKIT_ADDR: tcp://buildkitd.buildkit.svc.cluster.local:1234
+  # The checkout lives on the cluster's shared GPFS, mounted into every job pod.
+  SOURCE_DIR: /data2/synopsys
+  # Version label of the two open-PDK images.  Change it here and in the
+  # manifests that reference the images (ciel/k8s/).
+  CIEL_VERSION: "2026.11"
+  # Read by .github/scripts/select-products.sh: the dispatch product, and the
+  # previous tip of a push (empty outside push events).
+  PRODUCT: ${{ inputs.product }}
+  BEFORE: ${{ github.event.before }}
+
+jobs:
+  # build / runtime are the `FROM` of every product image, so they are
+  # built first.  Both are cheap and fully cached between runs.
+  bases:
+    name: ${{ matrix.name }}:${{ matrix.tag }}
+    runs-on: ubuntu-latest
+    container:
+      image: moby/buildkit:v0.34.1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: build
+            tag: "8.10"
+            dir: base
+            file: base/Containerfile.build
+            watch: base/Containerfile.build
+          - name: runtime
+            tag: "8.10"
+            dir: base
+            file: base/Containerfile.runtime
+            watch: base/Containerfile.runtime
+    steps:
+      - name: Check sources
+        shell: sh
+        run: |
+          set -eu
+          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+                          base '${{ matrix.watch }}' no)
+          [ "${decision}" = yes ] || exit 0
+
+          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
+
+          # Payloads are untracked, so a dirty tree means the image would not
+          # match the pushed or dispatched commit.
+          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+                   status --porcelain -- "${{ matrix.dir }}")
+          if [ -n "${dirt}" ]; then
+            echo "uncommitted changes under ${{ matrix.dir }}:"
+            echo "${dirt}"
+            [ '${{ inputs.allow_dirty }}' = true ] \
+              || { echo "refusing to build; commit the change, or dispatch with allow_dirty=true"; exit 1; }
+          fi
+
+      - name: Build and push
+        if: env.BUILD == 'yes'
+        shell: sh
+        run: |
+          set -eu
+          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          image="${REGISTRY}/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
+
+          # Cache is passed with --import-cache/--export-cache, not with the
+          # dockerfile frontend's cache-from/cache-to opt: the frontend parses
+          # those as comma-separated lists, so "type=registry,ref=x" arrives as
+          # two bogus sources ("ref=x" and "type=registry") and solve fails with
+          # "failed to configure registry cache importer: invalid reference
+          # format", silently leaving every build cold.
+          #
+          # Cache policy is mode=min: only the layers of the final image are
+          # exported.  mode=max also pushes every intermediate stage (the
+          # build base layers) to the cache tag on each build, which buys
+          # nothing for these 3-5 step Dockerfiles and doubles the traffic of a
+          # 30 GB image.
+          #
+          # Layer compression is zstd.  These images are essentially one huge
+          # layer (vcst: ~89 GB unpacked, ~30 GB compressed) and gzip
+          # compresses a layer on one core at ~13-16 MB/s here, so exporting
+          # alone costs 35-45 min; zstd is parallel (minutes instead).  The
+          # nodes run containerd 2.2, which pulls tar+zstd layers, and
+          # oci-mediatypes is required for the zstd media type.
+          buildctl --addr "${BUILDKIT_ADDR}" build \
+            --frontend dockerfile.v0 \
+            --local "context=${dir}" \
+            --local "dockerfile=${dir}" \
+            --opt "filename=$(basename "${{ matrix.file }}")" \
+            --import-cache "type=registry,ref=${image}-cache" \
+            --export-cache "type=registry,ref=${image}-cache,mode=min" \
+            --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
+
+          echo "pushed local.io/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
+
+  # One job per tool image; the matrix entry carries the version tag, so the
+  # registry never gets a floating tag.
+  tools:
+    name: ${{ matrix.name }}:${{ matrix.tag }}
+    runs-on: ubuntu-latest
+    needs: bases
+    container:
+      image: moby/buildkit:v0.34.1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: scl
+            tag: "2025.03"
+            dir: scl/2025.03
+            file: scl/2025.03/Containerfile
+            basedeps: build
+          - name: vcs
+            tag: "2025.06-SP1"
+            dir: vcs/2025.06-SP1
+            file: vcs/2025.06-SP1/Containerfile
+          # Older release of the same product: a separate tag, so a push to
+          # either version directory only rebuilds that one (dispatch of the
+          # product name rebuilds both).
+          - name: vcs
+            tag: "2023.12-SP2"
+            dir: vcs/2023.12-SP2
+            file: vcs/2023.12-SP2/Containerfile
+          - name: verdi
+            tag: "2025.06-SP1"
+            dir: verdi/2025.06-SP1
+            file: verdi/2025.06-SP1/Containerfile
+          - name: verdi
+            tag: "2023.12-SP2"
+            dir: verdi/2023.12-SP2
+            file: verdi/2023.12-SP2/Containerfile
+          - name: lc
+            tag: "2025.06"
+            dir: lc/2025.06
+            file: lc/2025.06/Containerfile
+          - name: spyglass
+            tag: "2025.06"
+            dir: spyglass/2025.06
+            file: spyglass/2025.06/Containerfile
+          - name: fm
+            tag: "2025.06"
+            dir: fm/2025.06
+            file: fm/2025.06/Containerfile
+          - name: pt
+            tag: "2025.06"
+            dir: pt/2025.06
+            file: pt/2025.06/Containerfile
+          - name: dc
+            tag: "2025.06-SP4"
+            dir: dc/2025.06-SP4
+            file: dc/2025.06-SP4/Containerfile
+          - name: fc
+            tag: "2025.06"
+            dir: fc/2025.06
+            file: fc/2025.06/Containerfile
+          - name: vcst
+            tag: "2025.06-SP2"
+            dir: vcst/2025.06-SP2
+            file: vcst/2025.06-SP2/Containerfile
+    steps:
+      - name: Check sources
+        shell: sh
+        run: |
+          set -eu
+          name='${{ matrix.name }}'
+          basedeps='${{ matrix.basedeps }}'
+          [ -n "${basedeps}" ] || basedeps=both
+          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+                          "${name}" '${{ matrix.dir }}' "${basedeps}")
+          [ "${decision}" = yes ] || exit 0
+
+          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
+
+          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+                   status --porcelain -- "${{ matrix.dir }}")
+          if [ -n "${dirt}" ]; then
+            echo "uncommitted changes under ${{ matrix.dir }}:"
+            echo "${dirt}"
+            [ '${{ inputs.allow_dirty }}' = true ] \
+              || { echo "refusing to build; commit the change, or dispatch with allow_dirty=true"; exit 1; }
+          fi
+
+      - name: Build and push
+        if: env.BUILD == 'yes'
+        shell: sh
+        run: |
+          set -eu
+          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          image="${REGISTRY}/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
+
+          # --import-cache/--export-cache rather than --opt cache-from/cache-to;
+          # see the note in the bases job.
+          buildctl --addr "${BUILDKIT_ADDR}" build \
+            --frontend dockerfile.v0 \
+            --local "context=${dir}" \
+            --local "dockerfile=${dir}" \
+            --opt "filename=$(basename "${{ matrix.file }}")" \
+            --opt "build-arg:EDABASE=${REGISTRY}/${NAMESPACE}" \
+            --import-cache "type=registry,ref=${image}-cache" \
+            --export-cache "type=registry,ref=${image}-cache,mode=min" \
+            --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
+
+          echo "pushed local.io/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
+
+  # The open PDKs are not a product image: the context is the generated PDK_ROOT
+  # tree, and Containerfile.pdk copies it into a scratch image that Kubernetes
+  # mounts as a read-only image volume.
+  ciel:
+    name: ciel-pdk
+    runs-on: ubuntu-latest
+    container:
+      image: moby/buildkit:v0.34.1
+    steps:
+      - name: Check sources
+        shell: sh
+        run: |
+          set -eu
+          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+                          ciel ciel no)
+          [ "${decision}" = yes ] || exit 0
+
+          dir="${SOURCE_DIR}/ciel"
+          [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
+          for ctx in pdk pdk-dc; do
+            [ -d "${dir}/${ctx}" ] || {
+              echo "missing ${dir}/${ctx}; run ciel/fetch_pdks.py, ciel/unpack_pdks.py, cp -al pdk pdk-dc and ciel/k8s/compile-db-job.yaml first"
+              exit 1
+            }
+          done
+
+          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+                   status --porcelain -- ciel)
+          if [ -n "${dirt}" ]; then
+            echo "uncommitted changes under ciel:"
+            echo "${dirt}"
+            [ '${{ inputs.allow_dirty }}' = true ] \
+              || { echo "refusing to build; commit the change, or dispatch with allow_dirty=true"; exit 1; }
+          fi
+
+      - name: Build and push
+        if: env.BUILD == 'yes'
+        shell: sh
+        run: |
+          set -eu
+          dir="${SOURCE_DIR}/ciel"
+
+          # versions.json carries the family versions, asset URLs and the sha256
+          # of every archive; the archives themselves are not in git. The only
+          # difference between the two images is the db/ tree in pdk-dc/.
+          for spec in "pdk:ciel-pdk:Containerfile.pdk" \
+                      "pdk-dc:ciel-pdk-dc:Containerfile.pdk-dc"; do
+            ctx=${spec%%:*}
+            rest=${spec#*:}
+            name=${rest%%:*}
+            file=${rest#*:}
+            image="${REGISTRY}/${NAMESPACE}/${name}:${CIEL_VERSION}"
+            echo "building ${name} from ${ctx} (${file})"
+            buildctl --addr "${BUILDKIT_ADDR}" build \
+              --frontend dockerfile.v0 \
+              --local "context=${dir}/${ctx}" \
+              --local "dockerfile=${dir}" \
+              --opt "filename=${file}" \
+              --opt "build-arg:CIEL_VERSION=${CIEL_VERSION}" \
+              --import-cache "type=registry,ref=${image}-cache" \
+              --export-cache "type=registry,ref=${image}-cache,mode=min" \
+              --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
+            echo "pushed local.io/${NAMESPACE}/${name}:${CIEL_VERSION}"
+          done
+
+  # VIP is a static file image, not a tool: the context is the payload
+  # directory and Containerfile installs the tree into a scratch image that
+  # Kubernetes mounts read-only at DESIGNWARE_HOME.
+  vip:
+    name: vip:2023.12
+    runs-on: ubuntu-latest
+    needs: bases
+    container:
+      image: moby/buildkit:v0.34.1
+    steps:
+      - name: Check sources
+        shell: sh
+        run: |
+          set -eu
+          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+                          vip vip build)
+          [ "${decision}" = yes ] || exit 0
+
+          dir="${SOURCE_DIR}/vip/2023.12"
+          [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
+          for f in vip_library19_svt_V-2023.12.run \
+                   vip_ecpri_svt_V-2023.12.run \
+                   vip_memory_svt_V-2023.12.run; do
+            [ -f "${dir}/${f}" ] || { echo "missing payload: ${dir}/${f}"; exit 1; }
+          done
+
+          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+                   status --porcelain -- vip)
+          if [ -n "${dirt}" ]; then
+            echo "uncommitted changes under vip:"
+            echo "${dirt}"
+            [ '${{ inputs.allow_dirty }}' = true ] \
+              || { echo "refusing to build; commit the change, or dispatch with allow_dirty=true"; exit 1; }
+          fi
+
+      - name: Build and push
+        if: env.BUILD == 'yes'
+        shell: sh
+        run: |
+          set -eu
+          dir="${SOURCE_DIR}/vip/2023.12"
+          image="${REGISTRY}/${NAMESPACE}/vip:2023.12"
+
+          buildctl --addr "${BUILDKIT_ADDR}" build \
+            --frontend dockerfile.v0 \
+            --local "context=${dir}" \
+            --local "dockerfile=${dir}" \
+            --opt filename=Containerfile \
+            --opt "build-arg:EDABASE=${REGISTRY}/${NAMESPACE}" \
+            --import-cache "type=registry,ref=${image}-cache" \
+            --export-cache "type=registry,ref=${image}-cache,mode=min" \
+            --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
+
+          echo "pushed local.io/${NAMESPACE}/vip:2023.12"
+
+  # The all-in-one image is assembled from the images above: every tool tree is
+  # copied out of the image that already installed and patched it, VIP out of
+  # vip/ and the CIEL PDKs out of ciel-pdk-dc/.  It therefore runs after them;
+  # when one of those jobs skipped its build (nothing changed) the image that is
+  # already in the registry is the input.  The only host-staged input is the
+  # KasmVNC RPM.
+  synopsys:
+    name: synopsys:2025.06
+    runs-on: ubuntu-latest
+    needs: [tools, vip, ciel]
+    container:
+      image: moby/buildkit:v0.34.1
+    steps:
+      - name: Check sources
+        shell: sh
+        run: |
+          set -eu
+          # A change anywhere in the source images changes what this image is
+          # assembled from, so they all count as dependencies.  These are the
+          # exact build contexts named in this Containerfile's FROM lines: an
+          # older release kept next to one of them (vcs/2023.12-SP2, ...) is a
+          # standalone product image and must not rebuild this one.
+          deps='vcs/2025.06-SP1:verdi/2025.06-SP1:lc/2025.06:spyglass/2025.06:fm/2025.06:pt/2025.06:dc/2025.06-SP4:fc/2025.06:vcst/2025.06-SP2:vip:ciel'
+          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+                          synopsys synopsys runtime "${deps}")
+          [ "${decision}" = yes ] || exit 0
+
+          dir="${SOURCE_DIR}/synopsys/2025.06"
+          [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
+
+          # Everything else comes out of a source image.
+          ls "${dir}"/kasmvnc/*.rpm >/dev/null 2>&1 || {
+            echo "missing KasmVNC RPM in ${dir}/kasmvnc; run synopsys/2025.06/fetch-kasmvnc.sh"; exit 1; }
+
+          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+                   status --porcelain -- synopsys)
+          if [ -n "${dirt}" ]; then
+            echo "uncommitted changes under synopsys:"
+            echo "${dirt}"
+            [ '${{ inputs.allow_dirty }}' = true ] \
+              || { echo "refusing to build; commit the change, or dispatch with allow_dirty=true"; exit 1; }
+          fi
+
+      - name: Build and push
+        if: env.BUILD == 'yes'
+        shell: sh
+        run: |
+          set -eu
+          dir="${SOURCE_DIR}/synopsys/2025.06"
+          image="${REGISTRY}/${NAMESPACE}/synopsys:2025.06"
+
+          # EDABASE is the prefix of every source image in the Containerfile and
+          # CIEL_VERSION selects the two open-PDK images.
+          buildctl --addr "${BUILDKIT_ADDR}" build \
+            --frontend dockerfile.v0 \
+            --local "context=${dir}" \
+            --local "dockerfile=${dir}" \
+            --opt filename=Containerfile \
+            --opt "build-arg:EDABASE=${REGISTRY}/${NAMESPACE}" \
+            --opt "build-arg:CIEL_VERSION=${CIEL_VERSION}" \
+            --import-cache "type=registry,ref=${image}-cache" \
+            --export-cache "type=registry,ref=${image}-cache,mode=min" \
+            --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
+
+          echo "pushed local.io/${NAMESPACE}/synopsys:2025.06"

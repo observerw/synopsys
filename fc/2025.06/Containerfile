@@ -1,0 +1,84 @@
+# Synopsys Fusion Compiler X-2025.06 (product fusioncompiler, linux64), license
+# checked out from a remote SCL/FlexLM server.
+#
+# Both stages come from base/ (see base/Containerfile.build / .runtime):
+#   build:8.10   Synopsys Installer, ValidationTool, SI_ACCEPT_LICENSE=1
+#   runtime:8.10 X11/GL/libstdc++/FlexLM runtime libraries
+#
+# Both the common and the linux64 package are delivered as .spf.partNN volumes;
+# batch_installer rebuilds each .spf through the Installer's joinEst.sh
+# (per-volume and joined-file MD5 verified).
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+ARG RUNTIME_IMAGE=${EDABASE}/runtime:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+COPY fusioncompiler_vX-2025.06_linux64.spf.part* \
+     fusioncompiler_vX-2025.06_common.spf.part* \
+     /tmp/src/
+
+# FC ships an interactive post-install hook (admin/install/FC/bin/install_fc);
+# gate on the installed tree instead of its exit status.
+RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
+        -target /opt/synopsys -install_as_root > /tmp/install.log 2>&1; \
+    rc=$?; tail -30 /tmp/install.log; echo "install_rc=$rc"; \
+    test -d /opt/synopsys/fusioncompiler/X-2025.06
+
+RUN ValidationTool -a -d /opt/synopsys/fusioncompiler/X-2025.06
+
+# dgcom_exec's RPATH puts shlib/export (and shlib/qt/export) ahead of /lib64, and
+# those directories carry an el7 libk5crypto.so.3.  libkrb5/libgssapi_krb5 come
+# from runtime's krb5-libs (el8), which needs symbols the bundled copy does
+# not export, so every start died with
+#   /lib64/libkrb5.so.3: undefined symbol: krb5int_c_deprecated_enctype,
+#   version k5crypto_3_MIT
+# Dropping the bundled copy is the same fix lc/2025.06/Containerfile, pt and fm
+# use, but FC needs one more step: shlib/ and shlib_python/ bundle their own
+# libcrypto.so.1.1 (1.1.1l/t) that was built without EVP_KDF_ctrl, so the el8
+# libk5crypto then fails with
+#   /lib64/libk5crypto.so.3: undefined symbol: EVP_KDF_ctrl,
+#   version OPENSSL_1_1_1b
+# Remove those copies too and let runtime's openssl-libs satisfy
+# libcrypto.so.1.1.  The el7 libssl.so.10/libcrypto.so.10 pair stays: libarrow,
+# libparquet and librdkafka need that soname and nothing else provides it.  The
+# copies under etc/Python/lib and etc/twkPython/lib are not on that RPATH and
+# stay for the bundled Python (see README, "Bundled crypto").
+RUN find /opt/synopsys/fusioncompiler/X-2025.06 -name 'libk5crypto.so.3*' -delete \
+ && rm -f /opt/synopsys/fusioncompiler/X-2025.06/linux64/nwtn/shlib/libcrypto.so.1.1 \
+          /opt/synopsys/fusioncompiler/X-2025.06/linux64/nwtn/shlib_python/libcrypto.so.1.1
+
+FROM ${RUNTIME_IMAGE}
+
+COPY --from=build /opt/synopsys/fusioncompiler/X-2025.06 \
+     /opt/synopsys/fusioncompiler/X-2025.06
+
+ENV SYNOPSYS=/opt/synopsys \
+    PATH=/opt/synopsys/fusioncompiler/X-2025.06/bin:$PATH
+
+# With the crypto fixes above in place, fc_shell still aborts on the FlexLM
+# hostid enumeration as soon as a license server is configured:
+#   realloc(): invalid pointer       (Error code=6)
+# in lc_checkout -> udev_hwdb_get_properties_list_entry, the same libudev
+# symbol-resolution bug lc/2025.06/Containerfile documents at length.  Preload
+# the system libudev, exactly as lc/pt/fm do.
+ENV LD_PRELOAD=/lib64/libudev.so.1
+
+# --- start probe ----------------------------------------------------------
+# Run the packaged probe as the last build step, so a tree that cannot start
+# never reaches the registry.  /tmp and /root are tmpfs for this step: the
+# tools keep their command logs and license cache there and none of that
+# belongs in the image.  Re-run the probe against the finished image with
+#   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh <image>
+COPY smoke.sh /opt/eda-smoke/smoke.sh
+RUN --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/root \
+    chmod 0755 /opt/eda-smoke/smoke.sh \
+ && /opt/eda-smoke/smoke.sh
+
+# The image entry point is the tool itself: a pod without a command, or
+# `nerdctl run -it <image>`, lands in the fc_shell prompt, and extra arguments
+# are passed straight through (`nerdctl run --rm <image> -f run.tcl`).  Use
+# `--entrypoint /bin/bash` (or `command: ["bash"]` in a pod) for a shell.
+WORKDIR /work
+ENTRYPOINT ["fc_shell"]

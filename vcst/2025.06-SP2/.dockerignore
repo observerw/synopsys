@@ -1,0 +1,5 @@
+# The merged ESTs are rebuilt from the partNN volumes inside the build.
+vc_static_vX-2025.06-SP2_common.spf
+vc_static_vX-2025.06-SP2_linux64.spf
+impl_vX-2025.06-SP2_common.spf
+impl_vX-2025.06-SP2_linux64.spf

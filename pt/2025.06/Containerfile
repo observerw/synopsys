@@ -1,0 +1,76 @@
+# Synopsys PrimeTime X-2025.06 (product prime, linux64), license checked out
+# from a remote SCL/FlexLM server.
+#
+# Both stages come from base/ (see base/Containerfile.build / .runtime):
+#   build:8.10   Synopsys Installer, ValidationTool, SI_ACCEPT_LICENSE=1
+#   runtime:8.10 X11/GL/libstdc++/FlexLM runtime libraries
+#
+# common is delivered as .spf.partNN volumes; batch_installer rebuilds the .spf
+# through the Installer's joinEst.sh (per-volume and joined-file MD5 verified).
+#
+# libmpi.so.1 links libnuma.so.1 for the multicore/distributed flow; numactl-libs
+# is part of runtime, so no extra layer is needed here.
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+ARG RUNTIME_IMAGE=${EDABASE}/runtime:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+COPY prime_vX-2025.06_linux64.spf \
+     prime_vX-2025.06_common.spf.part* \
+     /tmp/src/
+
+RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
+        -target /opt/synopsys -install_as_root > /tmp/install.log 2>&1; \
+    rc=$?; tail -30 /tmp/install.log; echo "install_rc=$rc"; \
+    test -d /opt/synopsys/prime/X-2025.06
+
+RUN ValidationTool -a -d /opt/synopsys/prime/X-2025.06
+
+# PT ships an el7-era libk5crypto in shlib/export and shlib/qt/export, and its
+# RPATH puts that directory ahead of /lib64.  libkrb5/libgssapi_krb5 however
+# come from runtime's krb5-libs (el8), which needs symbols the bundled copy
+# does not provide, so every pt_shell start died with
+#   /lib64/libkrb5.so.3: undefined symbol: krb5int_c_deprecated_enctype,
+#   version k5crypto_3_MIT
+# Dropping the bundled copy lets the matching system libk5crypto be used, the
+# same fix lc/2025.06/Containerfile applies to LC.  libssl.so.10 stays: nothing else
+# provides it and it links the system GSSAPI, which is the point.  The bundled
+# shlib/libcrypto.so.1.1 is not in the shadowing shlib/export RPATH and is used
+# by bundled Python/tcl, so it stays (see README, "Bundled crypto").
+RUN find /opt/synopsys/prime/X-2025.06 -name 'libk5crypto.so.3*' -delete
+
+FROM ${RUNTIME_IMAGE}
+
+COPY --from=build /opt/synopsys/prime/X-2025.06 /opt/synopsys/prime/X-2025.06
+
+ENV SYNOPSYS=/opt/synopsys \
+    PATH=/opt/synopsys/prime/X-2025.06/bin:$PATH
+
+# PT builds the hostid for its FlexLM checkout by enumerating /sys through
+# libudev; in a container that enumeration aborts the tool with
+# "realloc(): invalid pointer" (SIGABRT, error code 6) right after startup.
+# Loading libudev up front makes its symbols resolve to its own copy again, the
+# same workaround lc/2025.06/Containerfile documents at length.  Keep this next to the
+# krb5 fix above: with only the k5crypto fix applied pt_shell starts but still
+# dies on the checkout.
+ENV LD_PRELOAD=/lib64/libudev.so.1
+
+# --- start probe ----------------------------------------------------------
+# Run the packaged probe as the last build step, so a tree that cannot start
+# never reaches the registry.  /tmp and /root are tmpfs for this step: the
+# tools keep their command logs and license cache there and none of that
+# belongs in the image.  Re-run the probe against the finished image with
+#   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh <image>
+COPY smoke.sh /opt/eda-smoke/smoke.sh
+RUN --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/root \
+    chmod 0755 /opt/eda-smoke/smoke.sh \
+ && /opt/eda-smoke/smoke.sh
+
+# The image entry point is the tool itself: a pod without a command, or
+# `nerdctl run -it <image>`, lands in the pt_shell prompt, and extra arguments
+# are passed straight through (`nerdctl run --rm <image> -f run.tcl`).  Use
+# `--entrypoint /bin/bash` (or `command: ["bash"]` in a pod) for a shell.
+WORKDIR /work
+ENTRYPOINT ["pt_shell"]

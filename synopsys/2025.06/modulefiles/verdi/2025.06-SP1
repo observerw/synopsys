@@ -1,0 +1,11 @@
+#%Module1.0
+proc ModulesHelp { } {
+    global version
+    puts stderr "Verdi $version - Synopsys debug and waveform environment."
+    puts stderr "Sets VERDI_HOME and prepends \$VERDI_HOME/bin to PATH."
+}
+set version 2025.06-SP1
+set root /opt/synopsys/verdi/X-2025.06-SP1
+module-whatis "Synopsys Verdi $version"
+setenv VERDI_HOME $root
+prepend-path PATH $root/bin

@@ -1,0 +1,6 @@
+Containerfile
+.dockerignore
+vcs_vX-2025.06-SP1_common.spf
+vcs_vX-2025.06-SP1_linux64.spf.part00
+vcs_vX-2025.06-SP1_linux64.spf.part01
+vcs_vX-2025.06-SP1_linux64.spf.part02

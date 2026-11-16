@@ -1,0 +1,11 @@
+# Only the linux64/common packages are installed; keep the 32-bit linux and
+# aarch64 packages out of the build context.  This delivery ships the 32-bit
+# and aarch64 supplementary packages as single .spf files rather than volumes.
+verdi_vV-2023.12-SP2_linux.spf.part*
+verdi_vV-2023.12-SP2_aarch64.spf.part*
+verdi_supp_vV-2023.12-SP2_linux.spf
+verdi_supp_vV-2023.12-SP2_aarch64.spf
+
+# The merged ESTs are rebuilt from the partNN volumes inside the build.
+verdi_vV-2023.12-SP2_linux64.spf
+verdi_supp_vV-2023.12-SP2_linux64.spf

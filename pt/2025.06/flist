@@ -1,0 +1,6 @@
+Containerfile
+.dockerignore
+prime_vX-2025.06_linux64.spf
+prime_vX-2025.06_common.spf.part00
+prime_vX-2025.06_common.spf.part01
+prime_vX-2025.06_common.spf.part02

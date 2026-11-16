@@ -1,0 +1,102 @@
+# Smoke test for the all-in-one EDA image.
+#
+#   kubectl -n synopsys apply -f synopsys/2025.06/k8s/synopsys-smoke.yaml
+#   kubectl -n synopsys logs -f job/synopsys-smoke
+#
+# Checks every installed tree, the modulefiles, the PDK tree and the KasmVNC
+# tooling.  The version probes are informational: some tools ask for a license
+# even for -version.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: synopsys-smoke
+  namespace: synopsys
+  labels:
+    app: synopsys-smoke
+    kueue.x-k8s.io/queue-name: synopsys
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: synopsys-smoke
+        kueue.x-k8s.io/queue-name: synopsys
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: smoke
+          image: local.io/synopsys/synopsys:2025.06
+          # The tag is re-assembled in place when a tool image changes, so
+          # re-check it instead of trusting the node's cached copy.
+          imagePullPolicy: Always
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+
+              echo "===== trees ====="
+              test -d /opt/synopsys/vcs/X-2025.06-SP1
+              test -d /opt/synopsys/verdi/X-2025.06-SP1/platform/verdi_supp
+              test -d /opt/synopsys/syn/X-2025.06-SP4
+              test -d /opt/synopsys/fusioncompiler/X-2025.06
+              test -d /opt/synopsys/prime/X-2025.06
+              test -d /opt/synopsys/fm/X-2025.06
+              test -d /opt/synopsys/lc/X-2025.06
+              test -x /opt/synopsys/spyglass/X-2025.06/SPYGLASS_HOME/bin/spyglass
+              test -d /opt/synopsys/vc_static/X-2025.06-SP2
+              test -x /opt/synopsys/vc_static/X-2025.06-SP2/bin/vcf
+              test -d /opt/designware/vip/svt/amba_svt/V-2023.12
+              test -d /opt/designware/vip/svt/ecpri_svt/V-2023.12
+              test -d /opt/designware/vip/svt/memory_svt/V-2023.12
+              test -L /opt/designware/vip/svt/memory_svt/latest
+              test -x /opt/designware/bin/dwh_install
+              command -v dwh_install
+
+              echo "===== modules ====="
+              module avail 2>&1
+              for m in vcs verdi dc fc pt fm lc spyglass vcst; do
+                  module load "$m"
+                  module unload "$m"
+              done
+
+              echo "===== PDK ====="
+              # PDK and PDK_ROOT are image ENV, not a module
+              echo "PDK_ROOT=$PDK_ROOT PDK=$PDK"
+              test -n "$PDK"
+              test -d "$PDK_ROOT/$PDK/libs.ref"
+              test -f "$PDK_ROOT/versions.json"
+              test -d "$PDK_ROOT/sky130A/libs.ref"
+              test -d "$PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/db"
+              # the pristine copy under PDK_ROOT has no DC .db views
+              test -f "$PDK_ROOT/pristine/versions.json"
+              test -d "$PDK_ROOT/pristine/sky130A/libs.ref"
+              test ! -d "$PDK_ROOT/pristine/sky130A/libs.ref/sky130_fd_sc_hd/db"
+
+              echo "===== KasmVNC ====="
+              command -v vncserver
+              command -v kasmvncpasswd
+              test -x /usr/local/bin/eda-vnc
+              test -f /etc/kasmvnc/kasmvnc.yaml
+              command -v startxfce4
+
+              echo "===== versions (informational) ====="
+              module load vcs;   timeout 20 vcs -full64 -ID 2>&1 | head -3 || true
+              module load verdi; timeout 20 verdi -version 2>&1 | head -3 || true
+              module load dc;    timeout 20 dc_shell -version 2>&1 | head -3 || true
+              module load pt;    timeout 20 pt_shell -version 2>&1 | head -3 || true
+              module load fm;    timeout 20 fm_shell -version 2>&1 | head -3 || true
+
+              echo "SYNOPSYS_SMOKE_PASS"
+          env:
+            - name: SNPSLMD_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+            - name: LM_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+          resources:
+            requests:
+              cpu: "4"
+              memory: 16Gi

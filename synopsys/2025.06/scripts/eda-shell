@@ -1,0 +1,24 @@
+#!/bin/bash
+# Open an interactive shell with the EDA module environment already initialised.
+#
+#   eda-shell                 # no tool loaded
+#   eda-shell dc pt           # load the named modules first
+#   eda-shell --help
+
+set -euo pipefail
+
+if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
+    # Print the comment block at the top of this file.
+    sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+    echo
+    echo "Available modules:"
+    . /etc/profile.d/modules.sh
+    module avail 2>&1
+    exit 0
+fi
+
+. /etc/profile.d/modules.sh
+for m in "$@"; do
+    module load "$m"
+done
+exec bash -l

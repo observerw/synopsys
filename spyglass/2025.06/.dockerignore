@@ -1,0 +1,9 @@
+# The optional SpyGlass-VCS UFE package is a separate 18.4 GB EST (10 partNN
+# volumes, 51 GB unpacked) that installs its own product tree; it is not built
+# into this image and must stay out of the build context.
+ufe_optional_spyglass-vcs_vX-2025.06_common.spf.part*
+ufe_optional_spyglass-vcs_vX-2025.06_common.spf
+
+# The offline documentation is installed by the product's interactive
+# post-install hook, which this headless image does not run.
+spyglass_vX-2025.06_docs.tar.gz

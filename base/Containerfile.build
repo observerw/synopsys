@@ -1,0 +1,35 @@
+# Synopsys EDA build base: installer + ValidationTool.
+#
+# Built as synopsys/build:8.10; installs the Synopsys Installer (including
+# joinEst.sh, which batch_installer uses to rejoin *.spf.partNN volumes) and
+# ValidationTool, which validates the integrity of the Synopsys EDA tools.
+#
+#   FROM synopsys/build:8.10 AS build
+#   COPY *.spf /tmp/src/
+#   RUN SI_ACCEPT_LICENSE=1 /opt/synopsys-installer/batch_installer \
+#         -allprods -source /tmp/src -target /opt/synopsys -install_as_root \
+#    && ValidationTool -a -d /opt/synopsys
+
+ARG ALMA=almalinux:8.10
+FROM ${ALMA}
+
+# AlmaLinux 8.10 is EOL.
+RUN sed -i -e 's|^mirrorlist=|#mirrorlist=|' \
+           -e 's|^# baseurl=https://repo.almalinux.org|baseurl=https://mirrors.cloud.tencent.com|' \
+           /etc/yum.repos.d/almalinux.repo
+
+RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
+        --setopt=install_weak_deps=False install \
+        perl gcc glibc-devel make binutils bash tcsh \
+        tar gzip bzip2 xz unzip cpio file patch \
+        procps-ng \
+ && dnf clean all
+
+COPY SynopsysInstaller_v5.10.run /tmp/
+RUN perl /tmp/SynopsysInstaller_v5.10.run -dir /opt/synopsys-installer > /dev/null \
+ && test -x /opt/synopsys-installer/batch_installer \
+ && rm -f /tmp/SynopsysInstaller_v5.10.run
+
+COPY --chmod=755 ValidationTool /usr/local/bin/ValidationTool
+
+ENV SI_ACCEPT_LICENSE=1

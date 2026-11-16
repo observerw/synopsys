@@ -1,0 +1,9 @@
+Containerfile
+.dockerignore
+fusioncompiler_vX-2025.06_common.spf.part00
+fusioncompiler_vX-2025.06_common.spf.part01
+fusioncompiler_vX-2025.06_common.spf.part02
+fusioncompiler_vX-2025.06_common.spf.part03
+fusioncompiler_vX-2025.06_common.spf.part04
+fusioncompiler_vX-2025.06_linux64.spf.part00
+fusioncompiler_vX-2025.06_linux64.spf.part01

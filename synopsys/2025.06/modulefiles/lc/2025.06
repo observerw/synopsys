@@ -1,0 +1,14 @@
+#%Module1.0
+proc ModulesHelp { } {
+    global version
+    puts stderr "Library Compiler $version - Synopsys Liberty compiler (lc_shell)."
+    puts stderr "Sets LC_HOME, LC_STARTUP_CHECKOUT_LIC and preloads libudev."
+}
+set version 2025.06
+set root /opt/synopsys/lc/X-2025.06
+module-whatis "Synopsys Library Compiler $version"
+setenv LC_HOME $root
+setenv LC_STARTUP_CHECKOUT_LIC 1
+prepend-path PATH $root/bin
+# LC's hostid enumeration aborts without the libudev preload (lc/2025.06/Containerfile).
+prepend-path LD_PRELOAD /lib64/libudev.so.1

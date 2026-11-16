@@ -1,0 +1,39 @@
+# Vendor payloads are not versioned: they stay in the working tree and the
+# image builds read them from there (see README "Payloads").
+#
+# Text sources (Containerfiles, scripts, licenses) are tracked normally.
+
+# Synopsys installer, validation tool and EST images.
+*.run
+*.spf
+*.spf.part*
+ValidationTool
+
+# Vendor PDK archives: unpacked into the host-mounted PDK store, never built.
+*.tar.gz
+*.zip
+
+# Open PDK payload (CIEL): downloaded release archives and the unpacked
+# PDK_ROOT trees that Containerfile.pdk / Containerfile.pdk-dc bake into
+# local.io/synopsys/ciel-pdk and ciel-pdk-dc.
+*.tar.zst
+ciel/archives/*/
+ciel/pdk/
+ciel/pdk-dc/
+ciel/_work/
+
+# Host-mounted PDK store: hardlinked unpacked vendor trees (350+ GB). Never
+# versioned; provenance is documented in ciel/README.md.
+/pdk/
+
+# ASAP7 payloads: the upstream checkout and its Synopsys supplement live
+# untracked under ASAP7/, next to the tracked store tooling (README.md,
+# compile_db.sh, k8s/). Re-fetch them with:
+#   git clone --depth 1 https://github.com/The-OpenROAD-Project/asap7 ASAP7/asap7
+#   git -C ASAP7/asap7 submodule update --init --depth 1
+#   git clone --depth 1 https://github.com/snishizawa/asap7_snps ASAP7/asap7_snps
+/ASAP7/asap7/
+/ASAP7/asap7_snps/
+
+# Vendored skill checkout (reproducible from skills-lock.json).
+.agents/

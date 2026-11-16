@@ -1,0 +1,331 @@
+[
+  {
+    "family": "freepdk45",
+    "version": "784b1a483a5f4de362d6f3629378de1199453f3c",
+    "date": "2026-09-30T07:36:02Z",
+    "prerelease": true,
+    "variants": [
+      "freepdk45"
+    ],
+    "assets": [
+      {
+        "content": "common",
+        "filename": "common.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/freepdk45-784b1a483a5f4de362d6f3629378de1199453f3c/common.tar.zst",
+        "size": 8509762,
+        "sha256": "e8ad5751122dc63371a214f63fbd374fc5a098d0a8df40e89d6f71fa85e2e77b"
+      },
+      {
+        "content": "fakeram45",
+        "filename": "fakeram45.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/freepdk45-784b1a483a5f4de362d6f3629378de1199453f3c/fakeram45.tar.zst",
+        "size": 207867,
+        "sha256": "1c4f31f2dfd89e8cb8d113acdd5291211c3360c54352861419543c726e982385"
+      },
+      {
+        "content": "nangate45",
+        "filename": "nangate45.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/freepdk45-784b1a483a5f4de362d6f3629378de1199453f3c/nangate45.tar.zst",
+        "size": 1589951,
+        "sha256": "a0b4b30c9ec77e23a6154c30e1c8f206f00b9f0613b85dbf59c073a3a5d0df4f"
+      }
+    ]
+  },
+  {
+    "family": "gf180mcu",
+    "version": "792ef67037d74c8c51811eab3ce23cf793491296",
+    "date": "2026-10-19T09:09:31Z",
+    "prerelease": false,
+    "variants": [
+      "gf180mcuA",
+      "gf180mcuB",
+      "gf180mcuC",
+      "gf180mcuD"
+    ],
+    "assets": [
+      {
+        "content": "common",
+        "filename": "common.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/common.tar.zst",
+        "size": 170237948,
+        "sha256": "1342fe46866de6a3f1d8c3edb3193dafa4c3cf955cb987a17791b2287c41e39d"
+      },
+      {
+        "content": "gf180mcu_as_sc_mcu7t3v3",
+        "filename": "gf180mcu_as_sc_mcu7t3v3.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_as_sc_mcu7t3v3.tar.zst",
+        "size": 4856472,
+        "sha256": "3d5abbd4e36005c70aadb4a26ebca861bb45a44a58597b9fd45b343cd3f3428d"
+      },
+      {
+        "content": "gf180mcu_fd_io",
+        "filename": "gf180mcu_fd_io.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_fd_io.tar.zst",
+        "size": 24980953,
+        "sha256": "5ccbb2f0924933a1da0ffd5452ca583864c6987457b416d27a6907c007e57cf6"
+      },
+      {
+        "content": "gf180mcu_fd_ip_sram",
+        "filename": "gf180mcu_fd_ip_sram.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_fd_ip_sram.tar.zst",
+        "size": 28241964,
+        "sha256": "530b229173c3cac1875bb373d1eff9b37e0596414eb468fd92ba2d566112991c"
+      },
+      {
+        "content": "gf180mcu_fd_pr",
+        "filename": "gf180mcu_fd_pr.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_fd_pr.tar.zst",
+        "size": 51442,
+        "sha256": "f138d577baf9c2626da7a4afcc9287f41357bafbf7af68177b1c84119c5218f8"
+      },
+      {
+        "content": "gf180mcu_fd_sc_mcu7t5v0",
+        "filename": "gf180mcu_fd_sc_mcu7t5v0.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_fd_sc_mcu7t5v0.tar.zst",
+        "size": 180455243,
+        "sha256": "0d4b8cc43105865e09e192cab0a9f643845f9567b5782672a7be19b2499f9ce0"
+      },
+      {
+        "content": "gf180mcu_fd_sc_mcu9t5v0",
+        "filename": "gf180mcu_fd_sc_mcu9t5v0.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_fd_sc_mcu9t5v0.tar.zst",
+        "size": 180248541,
+        "sha256": "2e5597f73212f4453264170629c8f351fd482a8788473a25c945dd2823388fae"
+      },
+      {
+        "content": "gf180mcu_ocd_alpha_large",
+        "filename": "gf180mcu_ocd_alpha_large.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_ocd_alpha_large.tar.zst",
+        "size": 1250,
+        "sha256": "0cf22f3886d436178acdeb8c512b1c6b174c02cafd72304d027c3f2aa076307f"
+      },
+      {
+        "content": "gf180mcu_ocd_alpha_misc",
+        "filename": "gf180mcu_ocd_alpha_misc.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_ocd_alpha_misc.tar.zst",
+        "size": 2252,
+        "sha256": "0d37d98f047d3b348bc51f564274be20fd80b0008803e6f96d45ab773e8a4c5c"
+      },
+      {
+        "content": "gf180mcu_ocd_alpha_small",
+        "filename": "gf180mcu_ocd_alpha_small.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_ocd_alpha_small.tar.zst",
+        "size": 9195,
+        "sha256": "e69e41c5053f39e23bc27f5ef4d457778e3f5bb82897355dcabae60c010aac97"
+      },
+      {
+        "content": "gf180mcu_ocd_io",
+        "filename": "gf180mcu_ocd_io.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_ocd_io.tar.zst",
+        "size": 43308951,
+        "sha256": "c983735fe0e0bf1f865f7a4f9f1b003a9791f4a1f756c898072747bb1e3ee177"
+      },
+      {
+        "content": "gf180mcu_ocd_ip_sram",
+        "filename": "gf180mcu_ocd_ip_sram.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_ocd_ip_sram.tar.zst",
+        "size": 8572246,
+        "sha256": "1e0be26201ce2e32a8a44abc45f22bfcb81181cb3aa747f3326451b912e0d334"
+      },
+      {
+        "content": "gf180mcu_ocd_sc_rt12t3v3",
+        "filename": "gf180mcu_ocd_sc_rt12t3v3.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_ocd_sc_rt12t3v3.tar.zst",
+        "size": 1224000,
+        "sha256": "a504ab0125a59f6063a4dccf4a3dd22dab697a84f9e8a2698114c3b0928358ae"
+      },
+      {
+        "content": "gf180mcu_osu_sc_gp12t3v3",
+        "filename": "gf180mcu_osu_sc_gp12t3v3.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_osu_sc_gp12t3v3.tar.zst",
+        "size": 12731306,
+        "sha256": "d44ae769a76925839ecbe2f01ac1e7104c6e880f52352dda72d588abf64b1e6e"
+      },
+      {
+        "content": "gf180mcu_osu_sc_gp9t3v3",
+        "filename": "gf180mcu_osu_sc_gp9t3v3.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_osu_sc_gp9t3v3.tar.zst",
+        "size": 13325858,
+        "sha256": "09d493f9481bb5ba8ea7c8720c3fe3b90a9e35248e184ff265bb0c511d88a909"
+      },
+      {
+        "content": "gf180mcu_re_efuse",
+        "filename": "gf180mcu_re_efuse.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296/gf180mcu_re_efuse.tar.zst",
+        "size": 18537287,
+        "sha256": "85adcab379c06061a7f8f4124310dd6ab0b141f3636c4cd2801d7475973f79ec"
+      }
+    ]
+  },
+  {
+    "family": "ihp-sg13",
+    "version": "89d42ee6d2fd9b50b86a1aada6fee6673c3e6008",
+    "date": "2026-10-16T11:08:41Z",
+    "prerelease": true,
+    "variants": [
+      "ihp-sg13g2",
+      "ihp-sg13cmos5l"
+    ],
+    "assets": [
+      {
+        "content": "common",
+        "filename": "common.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/common.tar.zst",
+        "size": 457330513,
+        "sha256": "5792307959dfa7fceec25dbdc0f0cdceac4cf0a19d7455fd9e675d85d320bc01"
+      },
+      {
+        "content": "sg13cmos5l_io",
+        "filename": "sg13cmos5l_io.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/sg13cmos5l_io.tar.zst",
+        "size": 11510567,
+        "sha256": "120a0cbb429dabf2e5cd631877d6758840b0451a0a0bece3bb5fd114cd3f9af3"
+      },
+      {
+        "content": "sg13cmos5l_sram",
+        "filename": "sg13cmos5l_sram.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/sg13cmos5l_sram.tar.zst",
+        "size": 2669500,
+        "sha256": "c8dbb442708182075b8f2af6426dc81b8202db793fcc3f455f599600957b4867"
+      },
+      {
+        "content": "sg13cmos5l_stdcell",
+        "filename": "sg13cmos5l_stdcell.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/sg13cmos5l_stdcell.tar.zst",
+        "size": 6272019,
+        "sha256": "db5b8ece17cdff5df7dc224fa473bd3f909dcbc43e7140dc1a80a0d04f3ec819"
+      },
+      {
+        "content": "sg13g2_io",
+        "filename": "sg13g2_io.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/sg13g2_io.tar.zst",
+        "size": 12961394,
+        "sha256": "0edbc51834a260df8fc0fa00d9966396c2714ad0e7b5ddcc1264bd76fa1f820c"
+      },
+      {
+        "content": "sg13g2_pr",
+        "filename": "sg13g2_pr.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/sg13g2_pr.tar.zst",
+        "size": 175935,
+        "sha256": "f7f9c6f7c77e303776c6b3584fae382df8e90c2002ba5e6b8dd0640faf4272a1"
+      },
+      {
+        "content": "sg13g2_sram",
+        "filename": "sg13g2_sram.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/sg13g2_sram.tar.zst",
+        "size": 2667880,
+        "sha256": "ae0e556ef4b9b849ebcfd782fe1569a29a9969be9178da3b655b255db40f560f"
+      },
+      {
+        "content": "sg13g2_stdcell",
+        "filename": "sg13g2_stdcell.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/ihp-sg13-89d42ee6d2fd9b50b86a1aada6fee6673c3e6008/sg13g2_stdcell.tar.zst",
+        "size": 6376038,
+        "sha256": "a4e7c6fc25b681151a4ed2524c72d9db831890b7b4facc547ff195c292cd8740"
+      }
+    ]
+  },
+  {
+    "family": "sky130",
+    "version": "792ef67037d74c8c51811eab3ce23cf793491296",
+    "date": "2026-10-19T09:09:31Z",
+    "prerelease": false,
+    "variants": [
+      "sky130A",
+      "sky130B"
+    ],
+    "assets": [
+      {
+        "content": "common",
+        "filename": "common.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/common.tar.zst",
+        "size": 6598484,
+        "sha256": "1d8d8b7715e576ce12a36c24d1fd1a9df51482d528871cb161070c67b754a399"
+      },
+      {
+        "content": "sky130_fd_io",
+        "filename": "sky130_fd_io.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_io.tar.zst",
+        "size": 115591289,
+        "sha256": "1c0a41c98227b1fe83efb4438a99d560ff30ad2754683216800c416b79b9c276"
+      },
+      {
+        "content": "sky130_fd_pr",
+        "filename": "sky130_fd_pr.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_pr.tar.zst",
+        "size": 14186502,
+        "sha256": "3c70baa654186a6e4e651f7a485c32120d942ff10a7b7158b4c840867e1997e5"
+      },
+      {
+        "content": "sky130_fd_pr_reram",
+        "filename": "sky130_fd_pr_reram.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_pr_reram.tar.zst",
+        "size": 25705,
+        "sha256": "99ab4b6d7806c369c9f62e7a23f88c284e0b17ac61927700386252b5a011ba1f"
+      },
+      {
+        "content": "sky130_fd_sc_hd",
+        "filename": "sky130_fd_sc_hd.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_sc_hd.tar.zst",
+        "size": 127535591,
+        "sha256": "cbffe7898856df8a6593d3c984e28bd28ae3f229b7cd8dee1cd2a4c369acde0d"
+      },
+      {
+        "content": "sky130_fd_sc_hdll",
+        "filename": "sky130_fd_sc_hdll.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_sc_hdll.tar.zst",
+        "size": 126320834,
+        "sha256": "085f835b04a14cb28be77c7445dcda78104d73a389043c2eddc314bfbf20c3c2"
+      },
+      {
+        "content": "sky130_fd_sc_hs",
+        "filename": "sky130_fd_sc_hs.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_sc_hs.tar.zst",
+        "size": 633205370,
+        "sha256": "4eec37e402c94b6b59c952df91d9c5f018312ec254587008bce49f6ce2a31f39"
+      },
+      {
+        "content": "sky130_fd_sc_hvl",
+        "filename": "sky130_fd_sc_hvl.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_sc_hvl.tar.zst",
+        "size": 48103229,
+        "sha256": "682561d1a7a4c85bea4a20aec8ccf45850b745db5dc4b89295266daaf2788839"
+      },
+      {
+        "content": "sky130_fd_sc_lp",
+        "filename": "sky130_fd_sc_lp.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_sc_lp.tar.zst",
+        "size": 516416816,
+        "sha256": "c4029e4ff1b86e6b050a13722bcf5a49272d0123c1bae436f4de499df60f7eea"
+      },
+      {
+        "content": "sky130_fd_sc_ls",
+        "filename": "sky130_fd_sc_ls.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_sc_ls.tar.zst",
+        "size": 742960141,
+        "sha256": "8db1da3a6dfa343be36d36ead0b9e8629666c492c55abb3a4b3ba26de893d3b4"
+      },
+      {
+        "content": "sky130_fd_sc_ms",
+        "filename": "sky130_fd_sc_ms.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_fd_sc_ms.tar.zst",
+        "size": 589956619,
+        "sha256": "28158bf0a2a7f1906e3a586799a7d3be6be3930a75c44c0e21b57537855b7645"
+      },
+      {
+        "content": "sky130_ml_xx_hd",
+        "filename": "sky130_ml_xx_hd.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_ml_xx_hd.tar.zst",
+        "size": 10856,
+        "sha256": "5a15f2c452329896c6fbe1597783fce61d88c13572a890cd3f48964c170465dd"
+      },
+      {
+        "content": "sky130_sram_macros",
+        "filename": "sky130_sram_macros.tar.zst",
+        "url": "https://github.com/fossi-foundation/ciel-releases/releases/download/sky130-792ef67037d74c8c51811eab3ce23cf793491296/sky130_sram_macros.tar.zst",
+        "size": 29427753,
+        "sha256": "b5047b138f590bc148b90561fb205fe13e52f42efa5cb08910f18a341eb0cd8b"
+      }
+    ]
+  }
+]

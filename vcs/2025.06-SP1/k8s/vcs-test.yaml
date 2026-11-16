@@ -1,0 +1,24 @@
+# VCS X-2025.06-SP1 client.  License is checked out from the in-cluster
+# FlexLM server published as the `license` Service.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vcs-test
+  namespace: synopsys
+  labels:
+    app: vcs-test
+spec:
+  containers:
+    - name: vcs
+      image: local.io/synopsys/vcs:2025.06-SP1
+      imagePullPolicy: Always
+      command: ["sleep", "infinity"]
+      env:
+        - name: SNPSLMD_LICENSE_FILE
+          value: 2700@license.synopsys.svc.cluster.local
+        - name: LM_LICENSE_FILE
+          value: 2700@license.synopsys.svc.cluster.local
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi

@@ -1,0 +1,56 @@
+# FlexLM license server for the cluster.
+# The license is node-locked to MAC 52:54:00:ad:a0:86, so the entrypoint
+# rewrites eth0's MAC inside the pod (requires NET_ADMIN).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: license
+  labels:
+    app: license
+spec:
+  hostname: license
+  containers:
+    - name: scl
+      image: local.io/synopsys/scl:2025.03
+      securityContext:
+        capabilities:
+          add: ["NET_ADMIN"]
+      ports:
+        - name: lmgrd
+          containerPort: 2700
+        - name: snpslmd
+          containerPort: 2701
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: license
+spec:
+  selector:
+    app: license
+  ports:
+    - name: lmgrd
+      port: 2700
+      targetPort: 2700
+    - name: snpslmd
+      port: 2701
+      targetPort: 2701
+---
+# The vendor license's SERVER line reads "lic1"; clients resolve the name lmgrd
+# reports, so keep an alias next to the `license` Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: lic1
+  labels:
+    app: license
+spec:
+  selector:
+    app: license
+  ports:
+    - name: lmgrd
+      port: 2700
+      targetPort: 2700
+    - name: snpslmd
+      port: 2701
+      targetPort: 2701

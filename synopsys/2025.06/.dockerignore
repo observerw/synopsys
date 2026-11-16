@@ -1,0 +1,9 @@
+# Build context: synopsys/2025.06/
+#
+# Everything the Containerfile needs is COPYed from a source image (the product
+# trees, VIP, the PDKs) or fetched from the host: kasmvnc/*.rpm.  Keep the
+# text files that are not build inputs out of the context.
+README.md
+fetch-kasmvnc.sh
+k8s/
+.gitignore

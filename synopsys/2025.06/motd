@@ -1,0 +1,15 @@
+============================================================
+ Synopsys EDA 工具镜像  synopsys:2025.06
+------------------------------------------------------------
+ 工具默认不加载，用 module 选择：
+
+   module avail             列出可用工具
+   module load vcs verdi    加载工具（可同时加载多个）
+   module list              查看已加载
+   module purge             清空
+   eda-shell dc             打开已加载 dc 的 shell
+
+ PDK：默认已启用（PDK=sky130A，PDK_ROOT=/opt/pdk）
+ 路径：工具 /opt/synopsys   VIP /opt/designware
+       PDK /opt/pdk（含 DC .db）   原版 /opt/pdk/pristine
+============================================================

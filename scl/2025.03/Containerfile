@@ -1,0 +1,86 @@
+# Synopsys Common Licensing (SCL) FlexLM server.
+#
+# Serves the site license (license.dat, issued 2021-10-28, valid to 2049):
+#   - license binds hostid 525400ada086 (MAC 52:54:00:ad:a0:86)
+#   - lmgrd listens on 2700 and the vendor daemon is pinned to 2701, which is
+#     what Jobs pass as SNPSLMD_LICENSE_FILE/LM_LICENSE_FILE (2700@lic1); the
+#     ports in the licence file are config, not signed data
+#   - the entrypoint rewrites eth0's MAC to the licensed hostid
+#
+# As with the previous 2024.06 setup, the license is a site key file that the
+# stock daemons reject, so the build stage runs ValidationTool over the
+# install tree (like every other product image) and the runtime stage takes all
+# four daemons from that validated tree.  No binary payload is kept in scl/.
+# Real tool checkouts work (verified with a VCS compile + simulation and with
+# VC Formal SEQ).
+#
+# The license carries every VC Formal key: the token shell/runtime features
+# (VC-FORMAL-TOKEN-SH, VC-FORMAL-TOKEN-RT), the 2021.09 tiered runtimes
+# (VC-FORMAL-BASE-SH/BASE-RT, VC-FORMAL-ELITE-SH/ELITE-RT), every
+# VC-FORMAL-<app> key, the DPV/Hector set and the AIP-*-SVA assertion IPs, so
+# the default VC Formal mode runs without -fml_token.
+#
+# The build stage is the shared build image (Installer already unpacked,
+# gcc/perl present, SI_ACCEPT_LICENSE=1).  The runtime stage deliberately does
+# NOT use runtime: the daemons need only glibc, libgcc_s, libstdc++, liblzma
+# and iproute for the entrypoint, so pulling in the X11/GL/FlexLM client stack
+# of runtime would add ~285 MB to a license server for nothing.
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+ARG ALMA=almalinux:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+COPY scl_v2025.03_common.spf scl_v2025.03_linux64.spf /tmp/src/
+COPY snpslmd-hack.c /tmp/
+
+RUN gcc -shared -fPIC -O2 -o /tmp/snpslmd-hack.so /tmp/snpslmd-hack.c -ldl
+
+RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
+        -target /opt/synopsys -install_as_root > /tmp/install.log 2>&1; \
+    rc=$?; tail -20 /tmp/install.log; echo "install_rc=$rc"; \
+    test -x /opt/synopsys/scl/2025.03/linux64/bin/lmutil
+
+# Validate the SCL daemons (lmgrd, snpslmd, sssverify, lmutil) with
+# ValidationTool, which checks the integrity of the Synopsys EDA tools.
+RUN ValidationTool -a -d /opt/synopsys/scl/2025.03
+
+FROM ${ALMA} AS runtime
+
+# AlmaLinux 8.10 is EOL; point dnf at a mirror that still carries it.
+RUN sed -i -e 's|^mirrorlist=|#mirrorlist=|' \
+           -e 's|^# baseurl=https://repo.almalinux.org|baseurl=https://mirrors.cloud.tencent.com|' \
+           /etc/yum.repos.d/almalinux.repo
+
+# iproute is for the entrypoint's MAC rewrite; the rest are the daemons' own
+# shared-library needs, listed explicitly instead of relying on transitive deps.
+RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
+        --setopt=install_weak_deps=False install \
+        iproute libstdc++ libgcc xz-libs \
+ && dnf clean all
+
+# The daemons and lmutil come from the ValidationTool-validated install tree.
+# snpslmd-hack.so only normalises "." / ".." inode numbers while the daemons
+# scan "/" (overlayfs); without it snpslmd exits with "Cannot open daemon lock
+# file".
+COPY --from=build /opt/synopsys/scl/2025.03/linux64/bin/lmutil     /opt/synopsys/scl/2025.03/linux64/bin/lmutil
+COPY --from=build /opt/synopsys/scl/2025.03/linux64/bin/lmgrd      /opt/synopsys/scl/2025.03/linux64/bin/lmgrd
+COPY --from=build /opt/synopsys/scl/2025.03/linux64/bin/snpslmd    /opt/synopsys/scl/2025.03/linux64/bin/snpslmd
+COPY --from=build /opt/synopsys/scl/2025.03/linux64/bin/sssverify  /opt/synopsys/scl/2025.03/linux64/bin/sssverify
+COPY --from=build /tmp/snpslmd-hack.so                             /opt/synopsys/scl/2025.03/linux64/bin/snpslmd-hack.so
+
+COPY license.dat /opt/synopsys/scl/2025.03/admin/license/license.dat
+
+# Deployment-specific fields: the hostid stays as issued, the ports are pinned
+# to the ones the images and the Service already use (2700/2701).  The file has
+# CRLF line endings, so anchor on the value rather than on "$".
+RUN sed -i -e '1s/27000/2700/' \
+           -e '2s/PORT=49998/PORT=2701/' \
+           /opt/synopsys/scl/2025.03/admin/license/license.dat
+
+COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
+
+ENV PATH=/opt/synopsys/scl/2025.03/linux64/bin:$PATH
+
+EXPOSE 2700 2701
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

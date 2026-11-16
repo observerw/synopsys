@@ -1,0 +1,9 @@
+Containerfile
+.dockerignore
+verdi_vV-2023.12-SP2_common.spf
+verdi_vV-2023.12-SP2_linux64.spf.part00
+verdi_vV-2023.12-SP2_linux64.spf.part01
+verdi_vV-2023.12-SP2_linux64.spf.part02
+verdi_supp_vV-2023.12-SP2_common.spf
+verdi_supp_vV-2023.12-SP2_linux64.spf.part00
+verdi_supp_vV-2023.12-SP2_linux64.spf.part01

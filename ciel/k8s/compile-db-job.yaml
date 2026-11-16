@@ -1,0 +1,44 @@
+# Compile DC .db views for the typical corner of every Liberty library in the
+# DC copy of the PDK tree (pdk-dc/).
+#
+# This is a one-time payload preparation step, not part of the image build: the
+# CI build only copies the finished tree. Run the job before dispatching the
+# `ciel` product, because unpack_pdks.py rebuilds pdk/ from the archives. Build
+# pdk-dc/ from pdk/ first (cp -al pdk pdk-dc); the generated db/ directories
+# live only in the -dc copy.
+#
+# The lc image checks out a Library-Compiler license from the `license` Service and writes into
+# the GPFS tree; compile_db.sh skips libraries that already have a .db.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ciel-pdk-db
+  namespace: synopsys
+  labels:
+    kueue.x-k8s.io/queue-name: synopsys
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: lc
+          image: local.io/synopsys/lc:2025.06
+          env:
+            - name: SNPSLMD_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+            - name: LM_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+          command:
+            - bash
+            - -lc
+            - WORK=/work/_work/compile-db /work/compile_db.sh /work/pdk-dc 4
+          volumeMounts:
+            - name: work
+              mountPath: /work
+      volumes:
+        - name: work
+          hostPath:
+            path: /data2/synopsys/ciel
+            type: Directory

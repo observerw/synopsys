@@ -1,0 +1,14 @@
+Containerfile
+.dockerignore
+syn_vX-2025.06-SP4_linux64.spf
+syn_vX-2025.06-SP4_common.spf.part00
+syn_vX-2025.06-SP4_common.spf.part01
+syn_vX-2025.06-SP4_common.spf.part02
+syn_vX-2025.06-SP4_common.spf.part03
+syn_vX-2025.06-SP4_common.spf.part04
+syn_vX-2025.06-SP4_common.spf.part05
+syn_vX-2025.06-SP4_common.spf.part06
+syn_vX-2025.06-SP4_common.spf.part07
+syn_vX-2025.06-SP4_common.spf.part08
+syn_vX-2025.06-SP4_common.spf.part09
+syn_vX-2025.06-SP4_common.spf.part10

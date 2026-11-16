@@ -1,0 +1,91 @@
+# Smoke test: compile and run the vendor AHB SVT UVM example against VCS,
+# with the VIP tree mounted as a read-only image volume.
+#
+#   kubectl -n synopsys apply -f vip/2023.12/k8s/vip-vcs-smoke.yaml
+#   kubectl -n synopsys logs -f job/vip-vcs-smoke
+#
+# The VCS image carries Perl (for `-ntb_opts`/VIP setup), so the example is
+# generated in the same container as the run.  /work is an emptyDir; the
+# design tree never touches the host.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vip-vcs-smoke
+  namespace: synopsys
+  labels:
+    app: vip-vcs-smoke
+    kueue.x-k8s.io/queue-name: synopsys
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: vip-vcs-smoke
+        kueue.x-k8s.io/queue-name: synopsys
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-H200
+      containers:
+        - name: vcs
+          image: local.io/synopsys/vcs:2025.06-SP1
+          # Always: the smoke test is meant to exercise the freshly rebuilt
+          # VCS image even when a node already cached the previous tag.
+          imagePullPolicy: Always
+          env:
+            - name: DESIGNWARE_HOME
+              value: /opt/designware
+            - name: SNPSLMD_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+            - name: LM_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -eux
+              test -d "$DESIGNWARE_HOME/vip/svt/amba_svt/latest"
+              perl "$DESIGNWARE_HOME/vip/common/V-2023.12/bin/dw_vip_setup.pl" \
+                -path /work/design \
+                -e amba_svt/tb_ahb_svt_uvm_basic_active_passive_sys -svtb
+              ls -l /work/design/examples/sverilog/amba_svt/tb_ahb_svt_uvm_basic_active_passive_sys/run_*
+              set +eux
+              set -uo pipefail
+              cd /work/design/examples/sverilog/amba_svt/tb_ahb_svt_uvm_basic_active_passive_sys
+              tcsh ./run_ahb_svt_uvm_basic_active_passive_sys directed_test vcsvlog 2>&1 \
+                | tee /tmp/vip-run.log
+              rc=${PIPESTATUS[0]}
+              for f in logs/*.log; do
+                echo "===== $f ====="
+                tail -100 "$f" || true
+              done
+              echo "===== UVM summary ====="
+              grep -E 'UVM_(ERROR|FATAL) *:' logs/*.log 2>/dev/null | tail -10 || true
+              echo "vip_vcs_smoke_rc=$rc"
+              # Match the actual fatal line, not the "UVM_FATAL : 0" summary.
+              if grep -qE 'UVM_FATAL[[:space:]]+/|Invalid \(inconsistent\) license key|License checkout failure' logs/*.log 2>/dev/null; then
+                echo "VIP_SMOKE_FAIL: VIP license/runtime error"
+                exit 2
+              fi
+              test "$rc" -eq 0 || exit "$rc"
+              echo "VIP_SMOKE_PASS"
+          volumeMounts:
+            - name: vip
+              mountPath: /opt/designware
+              readOnly: true
+            - name: work
+              mountPath: /work
+          resources:
+            requests:
+              cpu: "8"
+              memory: 16Gi
+      volumes:
+        - name: vip
+          image:
+            reference: local.io/synopsys/vip:2023.12
+            # Always: the image is rebuilt/re-tagged when its contents change.
+            pullPolicy: Always
+        - name: work
+          emptyDir:
+            sizeLimit: 2Gi

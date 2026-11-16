@@ -1,0 +1,215 @@
+# syntax=docker/dockerfile:1
+#
+# All-in-one Synopsys EDA image:
+#
+#   VCS             X-2025.06-SP1
+#   Verdi           X-2025.06-SP1 (+ verdi_supp)
+#   Design Compiler X-2025.06-SP4 (product `syn`)
+#   Fusion Compiler X-2025.06
+#   PrimeTime       X-2025.06 (product `prime`)
+#   Formality       X-2025.06 (product `fm`)
+#   Library Compiler X-2025.06
+#   SpyGlass        X-2025.06
+#   VC Static / VC Formal X-2025.06-SP2 (vc_static + impl)
+#   VIP             V-2023.12 (library19 + ecpri + memory)
+#   Open PDKs       current CIEL release (CIEL_VERSION; sky130, gf180mcu, ihp-sg13, freepdk45; -dc views)
+#
+# This image installs nothing: every tool tree is copied out of the image that
+# already installed and patched it (`vcs/`, `verdi/`, ...), VIP out of `vip/`
+# and the PDK trees out of the two `ciel-pdk`/`ciel-pdk-dc` images.  That keeps
+# the vendor payloads out of this context (and out of the installer altogether)
+# and makes this job an assembly step after the product images.  ASAP7 is not
+# packaged; mount pdk/asap7-dc at /pdks when a flow needs it.
+#
+# The only file the build needs from outside an image is the KasmVNC RPM,
+# fetched into kasmvnc/ by fetch-kasmvnc.sh.
+#
+# The image is a desktop as well as a tool image: it ships XFCE, KasmVNC and
+# a CMD that starts a foreground KasmVNC server.  All tools live under
+# /opt/synopsys (VIP under /opt/designware, PDKs under /opt/pdk), and every
+# tool's environment is isolated in a modulefile under /opt/modulefiles.  No
+# product bin directory is on PATH by default; `module load <tool>` is what
+# selects a tool and its LD_LIBRARY_PATH/LD_PRELOAD quirks.
+#
+# The license is checked out from the cluster SCL/FlexLM server; no daemon and
+# no license file live in the image.
+#
+# The runtime base comes from base/ (see base/Containerfile.runtime).
+ARG EDABASE=local.io/synopsys
+ARG RUNTIME_IMAGE=${EDABASE}/runtime:8.10
+# Set by CI from the workflow's CIEL_VERSION; local builds must pass it too.
+ARG CIEL_VERSION
+
+# Source images.  Naming them as stages keeps the version tags in one place and
+# makes the COPY steps below read as the assembly they are.  These images must
+# already be in the registry: the CI builds this one after `tools`, `vip` and
+# `ciel`.
+FROM ${EDABASE}/vcs:2025.06-SP1 AS vcs
+FROM ${EDABASE}/verdi:2025.06-SP1 AS verdi
+FROM ${EDABASE}/dc:2025.06-SP4 AS dc
+FROM ${EDABASE}/fc:2025.06 AS fc
+FROM ${EDABASE}/pt:2025.06 AS pt
+FROM ${EDABASE}/fm:2025.06 AS fm
+FROM ${EDABASE}/lc:2025.06 AS lc
+FROM ${EDABASE}/spyglass:2025.06 AS spyglass
+FROM ${EDABASE}/vcst:2025.06-SP2 AS vcst
+FROM ${EDABASE}/vip:2023.12 AS vip
+FROM ${EDABASE}/ciel-pdk:${CIEL_VERSION} AS pdk
+FROM ${EDABASE}/ciel-pdk-dc:${CIEL_VERSION} AS pdk-dc
+
+FROM ${RUNTIME_IMAGE}
+
+LABEL org.opencontainers.image.title="Synopsys EDA suite" \
+      org.opencontainers.image.description="VCS, Verdi, Design Compiler, Fusion Compiler, PrimeTime, Formality, Library Compiler, SpyGlass, VC Static/VC Formal, VIP and the open PDKs in one module-managed desktop image" \
+      com.synopsys.vcs.version="X-2025.06-SP1" \
+      com.synopsys.verdi.version="X-2025.06-SP1" \
+      com.synopsys.syn.version="X-2025.06-SP4" \
+      com.synopsys.fusioncompiler.version="X-2025.06" \
+      com.synopsys.prime.version="X-2025.06" \
+      com.synopsys.fm.version="X-2025.06" \
+      com.synopsys.lc.version="X-2025.06" \
+      com.synopsys.spyglass.version="X-2025.06" \
+      com.synopsys.vc_static.version="X-2025.06-SP2" \
+      com.synopsys.vip.version="V-2023.12"
+
+# SYNOPSYS and DESIGNWARE_HOME are shared roots, not tool environments; the
+# modulefiles add each product's bin directory and private library settings.
+# Two things are not modules because they add no LD_* setting and no tool to
+# pick: the PDK (only the variant name PDK next to PDK_ROOT) and VIP (a compile
+# tree, whose bin/ holds just the dwh_install setup helpers).  Both are plain
+# image ENV, so every shell has them.  PDK_ROOT=/opt/pdk carries the DC .db
+# views; the pristine tree is /opt/pdk/pristine.
+ENV SYNOPSYS=/opt/synopsys \
+    DESIGNWARE_HOME=/opt/designware \
+    PDK_ROOT=/opt/pdk \
+    PDK=sky130A \
+    PATH=/opt/designware/bin:$PATH \
+    MODULEPATH=/opt/modulefiles
+
+# --- the trees, as installed and patched by their own images ---------------
+# Each source image already applied its runtime fixes (libk5crypto/libcrypto
+# removal for fc/pt/fm/lc, verdi_supp integration for verdi, ValidationTool
+# validation everywhere), so nothing has to be installed or checked here.
+#
+# The order is not cosmetic: a changed source image invalidates every COPY
+# after it, so the large tool trees go last, smallest first, and the two
+# standalone images (PDK, VIP) go first.
+#
+# Both trees of the same open-PDK release are baked in under PDK_ROOT, because
+# they are used in different places:
+#
+#   /opt/pdk           the tree with the typical-corner Design Compiler .db
+#                      views; PDK_ROOT points here and PDK names the variant.
+#   /opt/pdk/pristine  the pristine tree, exactly as the release publishes it,
+#                      with no .db views.  Point PDK_ROOT here for a flow that
+#                      must see the upstream tree untouched.
+#
+# Each tree is a scratch image whose root filesystem is that PDK root.
+COPY --from=pdk-dc / /opt/pdk
+COPY --from=pdk    / /opt/pdk/pristine
+
+# `vip/` is a scratch image whose root filesystem is DESIGNWARE_HOME.
+COPY --from=vip / /opt/designware
+
+COPY --from=fm    /opt/synopsys/fm             /opt/synopsys/fm
+COPY --from=spyglass /opt/synopsys/spyglass    /opt/synopsys/spyglass
+COPY --from=lc    /opt/synopsys/lc             /opt/synopsys/lc
+COPY --from=vcs   /opt/synopsys/vcs            /opt/synopsys/vcs
+COPY --from=pt    /opt/synopsys/prime          /opt/synopsys/prime
+COPY --from=verdi /opt/synopsys/verdi          /opt/synopsys/verdi
+COPY --from=fc    /opt/synopsys/fusioncompiler /opt/synopsys/fusioncompiler
+COPY --from=dc    /opt/synopsys/syn            /opt/synopsys/syn
+COPY --from=vcst  /opt/synopsys/vc_static      /opt/synopsys/vc_static
+
+# --- runtime packages ------------------------------------------------------
+# These used to be installed by the individual product images on top of
+# runtime, and this image copies only their trees, so their system packages
+# have to be provided here: perl for the VCS UVM/VIP setup helpers, and the
+# compiler toolchain for the VCS DPI/UVM flow and the VC Formal VCS reader; bc
+# and time provide the `dc` and `/usr/bin/time` that VCS and VC Formal shell out
+# to.  Keep this layer after the copies so a package change does not invalidate
+# the ~130 GB of copied trees.
+RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
+        --setopt=install_weak_deps=False install \
+        perl gcc gcc-c++ make binutils glibc-devel bc time \
+        tar gzip bzip2 xz unzip cpio file patch procps-ng \
+        openssl \
+ && dnf clean all \
+ && rm -rf /var/cache/dnf
+
+# --- desktop, KasmVNC and module tooling ----------------------------------
+# EPEL is pointed at the Tencent mirror because AlmaLinux 8.10 is EOL (same EPEL
+# mirror setup as the other images).
+#
+# KasmVNC follows the official RHEL 8-compatible instructions
+# (https://docs.kasmvnc.com/docs/install#rhel-8-compatible): enable
+# powertools/EPEL, then install the Oracle 8 RPM with dnf localinstall.  The
+# RPM is fetched into kasmvnc/ by fetch-kasmvnc.sh; it is not downloaded during
+# the build.
+#
+# xcb-util*/libxkbcommon are the Qt 5 xcb platform plugin dependencies that
+# `verdi/` installs on top of runtime; they are part of this list too.
+RUN --mount=type=bind,source=kasmvnc,target=/payload/kasmvnc \
+    dnf -y --setopt=install_weak_deps=False install epel-release \
+ && sed -i -e 's|^metalink=|#metalink=|' \
+           -e 's|^#baseurl=https://download.example/pub/epel|baseurl=https://mirrors.cloud.tencent.com/epel|' \
+           /etc/yum.repos.d/epel.repo \
+ && dnf -y --setopt=install_weak_deps=False --enablerepo=powertools,epel install \
+        environment-modules \
+        dbus-daemon \
+        xfce4-session xfce4-panel xfwm4 xfdesktop xfce4-terminal \
+        xfce4-settings xfce4-appfinder thunar xfce4-power-manager \
+        xfce4-notifyd xfce4-screenshooter \
+        xorg-x11-xinit xorg-x11-server-utils xorg-x11-utils xorg-x11-xauth \
+        xorg-x11-fonts-Type1 xorg-x11-fonts-misc mesa-dri-drivers \
+        xcb-util xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil \
+        libxkbcommon libxkbcommon-x11 \
+        git tmux screen vim-X11 vim-enhanced htop tree less which man-db man-pages \
+        bash-completion rsync openssh-clients lsof p7zip jq wget ctags gdb \
+        strace ltrace valgrind meld xclip xterm gtkwave evince ripgrep fzf sudo \
+        bind-utils iproute net-tools python3-pip \
+        dejavu-sans-fonts dejavu-sans-mono-fonts liberation-fonts \
+        wqy-microhei-fonts google-noto-sans-cjk-jp-fonts \
+ && dnf -y --setopt=install_weak_deps=False --enablerepo=powertools,epel \
+        localinstall /payload/kasmvnc/*.rpm \
+ && dnf clean all \
+ && rm -rf /var/cache/dnf
+
+# --- modulefiles and desktop helpers --------------------------------------
+COPY modulefiles /opt/modulefiles
+COPY motd /etc/motd
+COPY --chmod=0644 scripts/motd.sh /etc/profile.d/eda-motd.sh
+COPY kasmvnc/kasmvnc.yaml /etc/kasmvnc/kasmvnc.yaml
+COPY --chmod=0755 scripts/eda-vnc /usr/local/bin/eda-vnc
+COPY --chmod=0755 scripts/eda-shell /usr/local/bin/eda-shell
+COPY --chmod=0755 scripts/xstartup /etc/kasmvnc/xstartup
+
+# /etc/profile.d is only read by login shells; make the module function (and
+# the MOTD) available to the interactive non-login bash that XFCE terminals
+# start.
+RUN printf '\n%s\n' \
+        '[ -r /etc/profile.d/modules.sh ] && . /etc/profile.d/modules.sh' \
+        '[ -r /etc/profile.d/eda-motd.sh ] && . /etc/profile.d/eda-motd.sh' \
+        >> /etc/bashrc
+
+# --- final checks ----------------------------------------------------------
+# The COPY steps already guarantee the tool trees, so this only checks the
+# inputs that came in as whole trees rather than per-file COPYs: both PDK
+# roots (pristine has no .db, the -dc one does), the three VIP packages, and
+# the `module` shell function from a login shell.
+RUN test -f /opt/pdk/versions.json \
+ && test -L /opt/pdk/sky130A \
+ && test -d /opt/pdk/sky130A/libs.ref/sky130_fd_sc_hd/db \
+ && test -f /opt/pdk/pristine/versions.json \
+ && test -L /opt/pdk/pristine/sky130A \
+ && test ! -d /opt/pdk/pristine/sky130A/libs.ref/sky130_fd_sc_hd/db \
+ && test -d /opt/designware/vip/svt/memory_svt/V-2023.12 \
+ && test -d /opt/designware/vip/svt/ecpri_svt/V-2023.12 \
+ && bash -lc 'module --version' >/dev/null 2>&1
+
+# No ENTRYPOINT: the CMD starts the KasmVNC web desktop, and any command passed
+# after the image name (`nerdctl run <image> bash`, a k8s `command:`) replaces
+# it.  Use `eda-shell <module>` for an interactive shell with a tool selected.
+WORKDIR /work
+EXPOSE 6901
+CMD ["/usr/local/bin/eda-vnc"]

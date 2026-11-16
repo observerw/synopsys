@@ -1,0 +1,53 @@
+# The DC-ready PDK image mounted into a Design Compiler pod through a
+# Kubernetes image volume. The .db views were compiled by compile_db.sh, so
+# target_library can point straight at the mounted tree.
+#
+#   /pdk/sky130A/libs.ref/sky130_fd_sc_hd/db/sky130_fd_sc_hd__tt_025C_1v80.db
+#   ...
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ciel-pdk-dc-smoke
+  namespace: synopsys
+spec:
+  restartPolicy: Never
+  containers:
+    - name: dc
+      image: local.io/synopsys/dc:2025.06-SP4
+      workingDir: /tmp
+      env:
+        - name: SNPSLMD_LICENSE_FILE
+          value: 2700@license.synopsys.svc.cluster.local
+        - name: LM_LICENSE_FILE
+          value: 2700@license.synopsys.svc.cluster.local
+        - name: PDK_ROOT
+          value: /pdk
+      command:
+        - /bin/bash
+        - -lc
+        - |
+          set -eu
+          cat > /tmp/inv.v <<'EOF'
+          module inv(input a, output y);
+            sky130_fd_sc_hd__inv_2 u0 (.A(a), .Y(y));
+          endmodule
+          EOF
+          cat > /tmp/syn.tcl <<'EOF'
+          set target_library /pdk/sky130A/libs.ref/sky130_fd_sc_hd/db/sky130_fd_sc_hd__tt_025C_1v80.db
+          set link_library "* $target_library"
+          read_verilog /tmp/inv.v
+          link
+          compile
+          report_area
+          exit
+          EOF
+          dc_shell -f /tmp/syn.tcl
+      volumeMounts:
+        - name: pdk
+          mountPath: /pdk
+          readOnly: true
+  volumes:
+    - name: pdk
+      image:
+        reference: local.io/synopsys/ciel-pdk-dc:2026.11
+        pullPolicy: IfNotPresent

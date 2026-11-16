@@ -1,0 +1,49 @@
+# Open PDK root (pristine, no DC .db views) mounted read-only into a container
+# through a Kubernetes image volume: no hostPath, no NFS, no unpack step.
+# For Design Compiler use local.io/synopsys/ciel-pdk-dc:2026.11 and see
+# pdk-dc-image-volume.yaml instead.
+#
+# The tree from local.io/synopsys/ciel-pdk:2026.11 shows up at /pdk:
+#   /pdk/sky130A, /pdk/sky130B                     -> ciel/sky130/versions/...
+#   /pdk/gf180mcuD                                 -> ciel/gf180mcu/versions/...
+#   /pdk/ihp-sg13g2, /pdk/ihp-sg13cmos5l           -> ciel/ihp-sg13/versions/...
+#   /pdk/freepdk45                                 -> ciel/freepdk45/versions/...
+#   /pdk/versions.json                             CIEL versions + sha256
+#
+# Point PDK_ROOT at /pdk; the variant symlinks are relative, so they resolve
+# inside the mounted tree.
+#
+# Pulling happens once per node (kubelet caches the image); the mount is
+# read-only and shared by every replica on that node.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ciel-pdk-smoke
+  namespace: synopsys
+spec:
+  restartPolicy: Never
+  containers:
+    - name: pdks
+      # any image with a shell; this one only inspects the mount
+      image: local.io/synopsys/lc:2025.06
+      env:
+        - name: PDK_ROOT
+          value: /pdk
+      command:
+        - /bin/sh
+        - -c
+        - |
+          ls -l /pdk
+          for f in /pdk/ciel/*/current; do
+            printf '%s: %s\n' "$(basename "$(dirname "$f")")" "$(cat "$f")"
+          done
+          ls /pdk/sky130A/libs.ref | head
+      volumeMounts:
+        - name: pdk
+          mountPath: /pdk
+          readOnly: true
+  volumes:
+    - name: pdk
+      image:
+        reference: local.io/synopsys/ciel-pdk:2026.11
+        pullPolicy: IfNotPresent

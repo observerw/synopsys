@@ -1,0 +1,10 @@
+# Only the linux64/common packages are installed; keep the 32-bit linux and
+# aarch64 volumes out of the build context.
+verdi_vX-2025.06-SP1_linux.spf.part*
+verdi_vX-2025.06-SP1_aarch64.spf.part*
+verdi_supp_vX-2025.06-SP1_linux.spf.part*
+verdi_supp_vX-2025.06-SP1_aarch64.spf.part*
+
+# The merged ESTs are rebuilt from the partNN volumes inside the build.
+verdi_vX-2025.06-SP1_linux64.spf
+verdi_supp_vX-2025.06-SP1_linux64.spf

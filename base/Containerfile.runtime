@@ -1,0 +1,38 @@
+# Synopsys EDA runtime base: shared X11/GL/libc++/FlexLM deps.
+# el8 has no libXp/libXm; products needing them must ship their own copy.
+#
+# Built as synopsys/runtime:8.10.
+
+ARG ALMA=almalinux:8.10
+FROM ${ALMA}
+
+# AlmaLinux 8.10 is EOL.
+RUN sed -i -e 's|^mirrorlist=|#mirrorlist=|' \
+           -e 's|^# baseurl=https://repo.almalinux.org|baseurl=https://mirrors.cloud.tencent.com|' \
+           /etc/yum.repos.d/almalinux.repo
+
+RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
+        --setopt=install_weak_deps=False install \
+        glibc glibc-langpack-en libgcc libstdc++ libgomp \
+        zlib ncurses ncurses-libs readline \
+        nss nspr nss-util krb5-libs openssl-libs \
+        libX11 libXext libXft libXrender libXi libXtst libXrandr \
+        libXau libXdmcp libXcomposite libXdamage libXcursor libXfixes \
+        libXt libXmu libXpm libXScrnSaver \
+        libSM libICE \
+        mesa-libGL libglvnd-glx libglvnd-egl libdrm \
+        fontconfig freetype graphite2 \
+        alsa-lib pciutils-libs libaio libnsl numactl-libs systemd-libs \
+        tcsh ksh bash which findutils procps-ng util-linux \
+        iproute hostname tzdata ca-certificates \
+ && dnf clean all
+
+# systemd-libs is what provides the /lib64/libudev.so.1 that every FlexLM-based
+# product preloads; it used to arrive only as a transitive dependency.
+RUN mkdir -p /opt/synopsys /work \
+ && test -e /lib64/libudev.so.1
+
+ENV LANG=en_US.UTF-8
+
+WORKDIR /work
+CMD ["/bin/bash"]

@@ -1,0 +1,15 @@
+#%Module1.0
+proc ModulesHelp { } {
+    global version
+    puts stderr "SpyGlass $version - Synopsys lint and CDC (spyglass / sg_shell)."
+    puts stderr "Sets SPYGLASS_HOME and SPYGLASS_LD_PRELOAD, and prepends its bin directory to PATH."
+}
+set version 2025.06
+set root /opt/synopsys/spyglass/X-2025.06
+module-whatis "Synopsys SpyGlass $version"
+setenv SPYGLASS_HOME $root/SPYGLASS_HOME
+prepend-path PATH $root/SPYGLASS_HOME/bin
+# SpyGlass's hostid enumeration aborts without the libudev preload, but its
+# wrapper overwrites LD_PRELOAD with SPYGLASS_LD_PRELOAD before exec'ing the
+# checker, so the preload has to go through the latter (spyglass/2025.06/Containerfile).
+setenv SPYGLASS_LD_PRELOAD /lib64/libudev.so.1

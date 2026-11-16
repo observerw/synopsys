@@ -1,0 +1,84 @@
+#!/bin/bash
+# Start KasmVNC + XFCE in the foreground.
+#
+# KasmVNC is installed from the official RHEL 8-compatible Oracle 8 RPM (see
+# the Containerfile).  The browser is the normal client; KasmVNC serves the web
+# UI and websocket on one HTTPS port.  The container's CMD is this script, so
+# the process stays attached to PID 1 and `kubectl port-forward`/`nerdctl -p`
+# exposes the browser endpoint.
+#
+#   VNC_DISPLAY          :1          X display number
+#   VNC_WEBSOCKET_PORT   6901        HTTPS web/websocket port
+#   VNC_GEOMETRY         1920x1080   desktop size
+#   VNC_DEPTH            24          colour depth
+#   VNC_USER             kasm_user   KasmVNC HTTP Basic user
+#   VNC_PASSWORD         kasmvnc     password (KasmVNC requires >= 6 chars)
+#   EDA_MODULES          (empty)     modules loaded in the X session
+#
+# TLS, the listen interface and the frame rate are policy in
+# /etc/kasmvnc/kasmvnc.yaml; the variables above are the per-run overrides.
+set -euo pipefail
+
+DISPLAY_NUM=${VNC_DISPLAY:-:1}
+WEBSOCKET_PORT=${VNC_WEBSOCKET_PORT:-6901}
+GEOMETRY=${VNC_GEOMETRY:-1920x1080}
+DEPTH=${VNC_DEPTH:-24}
+VNC_USER=${VNC_USER:-kasm_user}
+PASSWORD=${VNC_PASSWORD:-kasmvnc}
+
+# A container may run with an empty or read-only HOME (e.g. an arbitrary UID).
+if [ -z "${HOME:-}" ] || [ ! -w "${HOME:-/nonexistent}" ]; then
+    HOME=/tmp/eda-home
+    export HOME
+fi
+
+VNC_DIR="$HOME/.vnc"
+mkdir -p "$VNC_DIR"
+chmod 700 "$VNC_DIR"
+
+# XFCE/D-Bus components expect a per-user runtime directory; containers often
+# start without one.
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "${XDG_RUNTIME_DIR:-/nonexistent}" ]; then
+    XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"
+    export XDG_RUNTIME_DIR
+fi
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+
+# KasmVNC's YAML config points at $HOME/.vnc/self.pem for both the certificate
+# and the key (the official example uses the same self-signed PEM for both).
+if [ ! -s "$VNC_DIR/self.pem" ]; then
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "$VNC_DIR/self.pem" -out "$VNC_DIR/self.pem" \
+        -subj "/C=US/ST=VA/L=None/O=None/OU=EDA/CN=kasmvnc/emailAddress=none@none.none" \
+        >/dev/null 2>&1
+fi
+chmod 600 "$VNC_DIR/self.pem"
+
+# KasmVNC uses HTTP Basic authentication against ~/.kasmpasswd, not the RFB
+# password file.  The official startup script feeds the password twice and
+# grants write+owner permission (kasmvncpasswd -u <user> -wo).
+PASSWD="$HOME/.kasmpasswd"
+rm -f "$PASSWD"
+umask 077
+printf '%s\n%s\n' "$PASSWORD" "$PASSWORD" | kasmvncpasswd -u "$VNC_USER" -wo
+chmod 600 "$PASSWD"
+
+# Remove sockets/locks left by a previous container that shared this volume.
+vncserver -kill "$DISPLAY_NUM" >/dev/null 2>&1 || true
+n=${DISPLAY_NUM#:}
+rm -f "/tmp/.X${n}-lock" "/tmp/.X11-unix/X${n}"
+rm -f "$VNC_DIR"/*"${DISPLAY_NUM}".pid "$VNC_DIR"/*"${n}".pid
+
+echo "eda-vnc: KasmVNC on https://0.0.0.0:${WEBSOCKET_PORT}/ (user ${VNC_USER})"
+echo "eda-vnc: display ${DISPLAY_NUM} (${GEOMETRY}, ${DEPTH}-bit)"
+echo "eda-vnc: modules loaded in the session: ${EDA_MODULES:-<none>}"
+
+exec vncserver "$DISPLAY_NUM" \
+    -fg \
+    -xstartup /etc/kasmvnc/xstartup \
+    -geometry "$GEOMETRY" \
+    -depth "$DEPTH" \
+    -websocketPort "$WEBSOCKET_PORT" \
+    -select-de manual \
+    -autokill

@@ -1,0 +1,25 @@
+# KasmVNC server configuration for the all-in-one EDA image.
+#
+# Installed at /etc/kasmvnc/kasmvnc.yaml.  KasmVNC merges this file over its own
+# /usr/share/kasmvnc/kasmvnc_defaults.yaml, so only keys that differ from the
+# defaults are listed here:
+#   * the per-user TLS PEM that eda-vnc generates on first start,
+#   * IPv4-only listening,
+#   * the video-streaming tuning,
+#   * a non-interactive command line.
+# Geometry, depth and the websocket port come from eda-vnc on the command line
+# (VNC_GEOMETRY, VNC_DEPTH, VNC_WEBSOCKET_PORT); ${HOME} interpolation is
+# supported by KasmVNC's YAML loader.
+network:
+  use_ipv6: false
+  ssl:
+    pem_certificate: ${HOME}/.vnc/self.pem
+    pem_key: ${HOME}/.vnc/self.pem
+
+encoding:
+  video_streaming_mode:
+    quality: 17
+    gop: 24
+
+command_line:
+  prompt: false

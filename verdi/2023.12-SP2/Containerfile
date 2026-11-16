@@ -1,0 +1,85 @@
+# Synopsys Verdi V-2023.12-SP2 (linux64), license checked out from a remote
+# SCL/FlexLM server.  The image contains no license server and no license file.
+#
+# This is the older release train kept alongside verdi/2025.06-SP1: same layout,
+# same runtime shape, different product tree (V-2023.12-SP2).
+#
+# Both stages come from base/ (see base/Containerfile.build / .runtime):
+#   build:8.10   Synopsys Installer, ValidationTool, SI_ACCEPT_LICENSE=1
+#   runtime:8.10 X11/GL/libstdc++/FlexLM runtime libraries
+#
+# common and the supplementary package arrive as single .spf files and
+# .spf.partNN volumes; batch_installer joins the volumes through the Installer's
+# joinEst.sh (per-volume and joined-file MD5 verified).
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+ARG RUNTIME_IMAGE=${EDABASE}/runtime:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+COPY verdi_vV-2023.12-SP2_common.spf \
+     verdi_vV-2023.12-SP2_linux64.spf.part00 \
+     verdi_vV-2023.12-SP2_linux64.spf.part01 \
+     verdi_vV-2023.12-SP2_linux64.spf.part02 \
+     verdi_supp_vV-2023.12-SP2_common.spf \
+     verdi_supp_vV-2023.12-SP2_linux64.spf.part00 \
+     verdi_supp_vV-2023.12-SP2_linux64.spf.part01 \
+     /tmp/src/
+
+# verdi_supp's post-install hook derives its arguments from an installed VCS
+# (`vcs -id`), which this image does not carry, so the installer records the
+# supplementary product as failed even though both trees are complete.  What the
+# hook would do is only the two steps below, so gate on the trees and do the
+# integration by hand:
+#   mv $TARGET/verdi_supp $VERDI_HOME/platform/verdi_supp
+#   ln -s ../../verdi_supp/V-2023.12-SP2 $VERDI_HOME/platform/linux64/lib/vcs
+RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
+        -target /opt/synopsys -install_as_root > /tmp/install.log 2>&1; \
+    rc=$?; tail -30 /tmp/install.log; echo "install_rc=$rc"; \
+    test -d /opt/synopsys/verdi/V-2023.12-SP2 \
+ && test -d /opt/synopsys/verdi_supp/V-2023.12-SP2 \
+ && mv /opt/synopsys/verdi_supp \
+        /opt/synopsys/verdi/V-2023.12-SP2/platform/verdi_supp \
+ && ln -s ../../verdi_supp/V-2023.12-SP2 \
+        /opt/synopsys/verdi/V-2023.12-SP2/platform/linux64/lib/vcs
+
+# ValidationTool: validate the integrity of the installed Synopsys EDA tools,
+# including the supplementary tree, which now lives under VERDI_HOME.
+RUN ValidationTool -a -d /opt/synopsys/verdi/V-2023.12-SP2
+
+FROM ${RUNTIME_IMAGE}
+
+# The Qt 5 xcb platform plugin (loaded even by `verdi -id`) needs the
+# xcb-util-* and libxkbcommon libraries that runtime does not carry.
+# Verdi ships copies under platform/linux64/lib/Qt5/lib/depends/xlib, but its
+# own dlCheck has to run before the wrapper adds that directory, so provide the
+# system packages instead of relying on the bundled set.
+RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
+        --setopt=install_weak_deps=False install \
+        xcb-util xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil \
+        libxkbcommon libxkbcommon-x11 \
+ && dnf clean all
+
+COPY --from=build /opt/synopsys/verdi/V-2023.12-SP2 /opt/synopsys/verdi/V-2023.12-SP2
+
+ENV VERDI_HOME=/opt/synopsys/verdi/V-2023.12-SP2 \
+    PATH=/opt/synopsys/verdi/V-2023.12-SP2/bin:$PATH
+
+# --- start probe ----------------------------------------------------------
+# Run the packaged probe as the last build step, so a tree that cannot start
+# never reaches the registry.  /tmp and /root are tmpfs for this step: the
+# tools keep their command logs and license cache there and none of that
+# belongs in the image.  Re-run the probe against the finished image with
+#   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh <image>
+COPY smoke.sh /opt/eda-smoke/smoke.sh
+RUN --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/root \
+    chmod 0755 /opt/eda-smoke/smoke.sh \
+ && /opt/eda-smoke/smoke.sh
+
+# The image entry point is the tool itself: a pod without a command, or
+# `nerdctl run -it <image>`, starts Verdi, and extra arguments are passed
+# straight through (`nerdctl run --rm <image> -ssf dump.fsdb`).  Use
+# `--entrypoint /bin/bash` (or `command: ["bash"]` in a pod) for a shell.
+WORKDIR /work
+ENTRYPOINT ["verdi"]

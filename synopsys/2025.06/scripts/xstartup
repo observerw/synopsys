@@ -1,0 +1,19 @@
+#!/bin/sh
+# X session started by eda-vnc inside the KasmVNC display.
+#
+# vncserver does not run a login shell, so the module function (provided by
+# environment-modules' /etc/profile.d/modules.sh) is initialised here before
+# the optional EDA_MODULES list is loaded and XFCE starts.
+if [ -r /etc/profile.d/modules.sh ]; then
+    . /etc/profile.d/modules.sh
+fi
+
+for m in ${EDA_MODULES:-}; do
+    if ! module load "$m"; then
+        echo "eda-vnc: could not load module $m" >&2
+    fi
+done
+
+# D-Bus is required by several XFCE components; dbus-run-session comes from
+# the dbus-daemon package installed by the Containerfile.
+exec dbus-run-session -- startxfce4

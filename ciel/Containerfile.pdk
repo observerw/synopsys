@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+#
+# Open-source PDK payload (CIEL releases), baked into an image that is meant to
+# be consumed as a Kubernetes *image volume* (read-only mount), not to be run:
+#
+#   volumes:
+#     - name: pdk
+#       image:
+#         reference: local.io/synopsys/ciel-pdk:2026.11
+#         pullPolicy: IfNotPresent
+#
+# Build context: the unpacked PDK root tree (default <repo>/ciel/pdk), produced
+# by unpack_pdks.py from the CIEL release archives:
+#
+#   /pdk/ciel/<family>/versions/<version>/<variant>/...
+#   /pdk/ciel/<family>/current
+#   /pdk/<variant> -> ciel/<family>/versions/<version>/<variant>
+#   /pdk/versions.json
+#
+# PDK_ROOT=/pdk resolves every variant (sky130A, gf180mcuD, ihp-sg13g2, ...)
+# through the same relative symlinks `ciel enable` would create.
+
+FROM scratch
+
+ARG CIEL_VERSION
+
+# An image volume exposes the *root filesystem* of the image, so the PDK tree
+# lives at the image root: mounting the image at /pdk yields /pdk/sky130A, ...
+COPY . /
+
+LABEL org.opencontainers.image.title="Open PDK root (CIEL)" \
+      org.opencontainers.image.description="Newest CIEL release of sky130, gf180mcu, ihp-sg13 and freepdk45, unpacked as a PDK_ROOT tree, ready to mount" \
+      org.opencontainers.image.version="${CIEL_VERSION}" \
+      org.opencontainers.image.source="https://github.com/fossi-foundation/ciel" \
+      com.ciel.sky130.version="792ef67037d74c8c51811eab3ce23cf793491296" \
+      com.ciel.gf180mcu.version="792ef67037d74c8c51811eab3ce23cf793491296" \
+      com.ciel.ihp-sg13.version="89d42ee6d2fd9b50b86a1aada6fee6673c3e6008" \
+      com.ciel.freepdk45.version="784b1a483a5f4de362d6f3629378de1199453f3c"

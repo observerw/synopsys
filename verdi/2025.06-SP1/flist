@@ -1,0 +1,9 @@
+Containerfile
+.dockerignore
+verdi_vX-2025.06-SP1_common.spf
+verdi_vX-2025.06-SP1_linux64.spf.part00
+verdi_vX-2025.06-SP1_linux64.spf.part01
+verdi_vX-2025.06-SP1_linux64.spf.part02
+verdi_supp_vX-2025.06-SP1_common.spf
+verdi_supp_vX-2025.06-SP1_linux64.spf.part00
+verdi_supp_vX-2025.06-SP1_linux64.spf.part01

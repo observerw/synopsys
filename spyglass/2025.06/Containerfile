@@ -1,0 +1,85 @@
+# Synopsys SpyGlass X-2025.06 (product spyglass), license checked out from a
+# remote SCL/FlexLM server.  The image contains no license server and no
+# license file.
+#
+# Both stages come from base/ (see base/Containerfile.build / .runtime):
+#   build:8.10   Synopsys Installer, ValidationTool, SI_ACCEPT_LICENSE=1
+#   runtime:8.10 X11/GL/libstdc++/FlexLM runtime libraries
+#
+# SpyGlass is delivered as a single platform-independent `common` EST (marked
+# PIONLY in package_info) that already carries the Linux4/linux64 objects, so
+# there is no separate linux64 volume to install.
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+ARG RUNTIME_IMAGE=${EDABASE}/runtime:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+COPY spyglass_vX-2025.06_common.spf /tmp/src/
+
+# SPYGLASS_HOME/etc/post_install.sh only installs the offline documentation and
+# reads the docs directory interactively through -docSourcePath; the argument
+# is not reachable from batch_installer's -allprods mode, and the filename the
+# hook derives (`Spyglass_docs_<version>.tar.gz`) does not match the delivered
+# `spyglass_vX-2025.06_docs.tar.gz`.  Without it the installer records the
+# product as failed (install_rc=1) although the complete tool tree is written,
+# so gate on the tree exactly like fc/verdi/lc do.  The 1.1 GB docs tarball is
+# not shipped (see README, "Payloads that are present but never built").
+RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
+        -target /opt/synopsys -install_as_root > /tmp/install.log 2>&1; \
+    rc=$?; tail -30 /tmp/install.log; echo "install_rc=$rc"; \
+    test -x /opt/synopsys/spyglass/X-2025.06/SPYGLASS_HOME/bin/spyglass
+
+# ValidationTool: validate the integrity of the installed Synopsys EDA tools.
+RUN ValidationTool -a -d /opt/synopsys/spyglass/X-2025.06
+
+FROM ${RUNTIME_IMAGE}
+
+COPY --from=build /opt/synopsys/spyglass/X-2025.06 \
+     /opt/synopsys/spyglass/X-2025.06
+
+# The wrappers derive SPYGLASS_HOME from their own path, but export it anyway
+# so `sg_shell`, the policy scripts and user Tcl see the same tree.
+ENV SYNOPSYS=/opt/synopsys \
+    SPYGLASS_HOME=/opt/synopsys/spyglass/X-2025.06/SPYGLASS_HOME \
+    PATH=/opt/synopsys/spyglass/X-2025.06/SPYGLASS_HOME/bin:$PATH
+
+# Every `sg_shell` / `spyglass -shell` start aborts before the first prompt
+# with
+#   mremap_chunk(): invalid pointer        (SIGABRT, error code 6)
+# while `spyglass -version` is fine: the version probe takes no license, and
+# the abort is in lc_checkout, which builds the hostid by enumerating /sys
+# through libudev.  It is the same libudev symbol-resolution bug that
+# lc/2025.06/Containerfile documents at length (the stack is lc_checkout ->
+# udev_enumerate_scan_devices -> strextend_with_separator -> realloc), and it
+# reproduces with and without a license server configured.
+#
+# Unlike lc/fc/pt/fm, the plain `LD_PRELOAD=/lib64/libudev.so.1` fix does not
+# work here: spyglass_main replaces LD_PRELOAD with SPYGLASS_LD_PRELOAD right
+# before it execs the checker, and SPYGLASS_HOME/.spyglass.setup selects the
+# SNPS memory manager (`OPTIMIZE_PERF = snpsmem`, i.e. libreplacemalloc.so), so
+# the system libudev has to be exported through SPYGLASS_LD_PRELOAD.  The
+# wrapper appends its own allocator after that entry, which keeps libudev first
+# in symbol resolution and stops the crash; the memory manager itself is left
+# enabled as delivered.
+ENV SPYGLASS_LD_PRELOAD=/lib64/libudev.so.1
+
+# --- start probe ----------------------------------------------------------
+# Run the packaged probe as the last build step, so a tree that cannot start
+# never reaches the registry.  /tmp and /root are tmpfs for this step: the
+# tools keep their command logs and license cache there and none of that
+# belongs in the image.  Re-run the probe against the finished image with
+#   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh <image>
+COPY smoke.sh /opt/eda-smoke/smoke.sh
+RUN --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/root \
+    chmod 0755 /opt/eda-smoke/smoke.sh \
+ && /opt/eda-smoke/smoke.sh
+
+# The image entry point is the tool itself: a pod without a command, or
+# `nerdctl run -it <image>`, starts the SpyGlass driver, and extra arguments
+# are passed straight through (`nerdctl run --rm <image> -project run.prj
+# -batch`).  Use `--entrypoint /bin/bash` (or `command: ["bash"]` in a pod)
+# for a shell, and `sg_shell` for the interactive Tcl shell.
+WORKDIR /work
+ENTRYPOINT ["spyglass"]

@@ -1,0 +1,10 @@
+#%Module1.0
+proc ModulesHelp { } {
+    global version
+    puts stderr "Design Compiler $version - Synopsys RTL synthesis (dc_shell)."
+    puts stderr "Prepends the dc_shell bin directory to PATH."
+}
+set version 2025.06-SP4
+set root /opt/synopsys/syn/X-2025.06-SP4
+module-whatis "Synopsys Design Compiler $version"
+prepend-path PATH $root/bin

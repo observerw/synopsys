@@ -1,0 +1,11 @@
+#%Module1.0
+proc ModulesHelp { } {
+    global version
+    puts stderr "VCS $version - Synopsys Verilog compiler and simulator."
+    puts stderr "Sets VCS_HOME and prepends \$VCS_HOME/bin to PATH."
+}
+set version 2025.06-SP1
+set root /opt/synopsys/vcs/X-2025.06-SP1
+module-whatis "Synopsys VCS $version"
+setenv VCS_HOME $root
+prepend-path PATH $root/bin

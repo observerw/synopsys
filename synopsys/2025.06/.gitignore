@@ -1,0 +1,3 @@
+# kasmvnc/*.rpm is fetched by fetch-kasmvnc.sh; it is the only file the image
+# needs from outside an image.  Everything else is copied out of a source image.
+/kasmvnc/*.rpm

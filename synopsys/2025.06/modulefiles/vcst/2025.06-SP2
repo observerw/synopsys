@@ -1,0 +1,16 @@
+#%Module1.0
+proc ModulesHelp { } {
+    global version
+    puts stderr "VC Static / VC Formal $version (vc_static_shell, vcf)."
+    puts stderr "Sets VC_STATIC_HOME, PATH and the bundled Qt/xcb LD_LIBRARY_PATH."
+}
+set version 2025.06-SP2
+set root /opt/synopsys/vc_static/X-2025.06-SP2
+module-whatis "Synopsys VC Static and VC Formal $version"
+setenv VC_STATIC_HOME $root
+prepend-path PATH $root/bin
+# vc_static_shell and vcf load the Qt/xcb copies shipped under IMPL_COMPAT.
+# prepend-path is applied in reverse so the final order matches vcst/Containerfile.
+prepend-path LD_LIBRARY_PATH $root/linux64/vcst/lib/etc/lib/libxcb/LINUX64
+prepend-path LD_LIBRARY_PATH $root/IMPL_COMPAT/LC/amd64/nwtn/shlib/export
+prepend-path LD_LIBRARY_PATH $root/IMPL_COMPAT/LC/amd64/nwtn/shlib/qt

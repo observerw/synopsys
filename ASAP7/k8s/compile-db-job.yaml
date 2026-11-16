@@ -1,0 +1,55 @@
+# Compile DC .db views for the ASAP7 store entry (pdk/asap7-dc).
+#
+# ASAP7 publishes Liberty as *.lib.7z, so extract the corners you need into the
+# tree on the host before dispatching this job; compile_db.sh picks up
+#   asap7sc7p5t_28/LIB/NLDM/*.lib        -> asap7sc7p5t_28/LIB/db/*.db
+#   asap7sc6t_26/LIB/NLDM/*.lib          -> asap7sc6t_26/LIB/db/*.db
+#   asap7_sram_0p0/generated/LIB/*.lib   -> asap7_sram_0p0/generated/db/*.db
+#
+# Build the -dc tree from the pristine one first (cp -al asap7 asap7-dc) and run
+# the job from the host that holds /data2; it reuses the lc image and checks out
+# a Library-Compiler license from the `license` Service.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: asap7-db
+  namespace: synopsys
+  labels:
+    kueue.x-k8s.io/queue-name: synopsys
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: lc
+          image: local.io/synopsys/lc:2025.06
+          env:
+            - name: SNPSLMD_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+            - name: LM_LICENSE_FILE
+              value: 2700@license.synopsys.svc.cluster.local
+          command:
+            - bash
+            - -lc
+            - WORK=/tmp/compile-db /work/compile_db.sh /pdk/asap7-dc 8
+          resources:
+            requests:
+              cpu: "8"
+              memory: 32Gi
+          volumeMounts:
+            - name: pdk
+              mountPath: /pdk
+            - name: asap7
+              mountPath: /work
+              readOnly: true
+      volumes:
+        - name: pdk
+          hostPath:
+            path: /data2/synopsys/pdk
+            type: Directory
+        - name: asap7
+          hostPath:
+            path: /data2/synopsys/ASAP7
+            type: Directory

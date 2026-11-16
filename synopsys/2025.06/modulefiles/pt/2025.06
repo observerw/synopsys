@@ -1,0 +1,13 @@
+#%Module1.0
+proc ModulesHelp { } {
+    global version
+    puts stderr "PrimeTime $version - Synopsys sign-off STA (pt_shell)."
+    puts stderr "Prepends \$root/bin to PATH and preloads libudev for the FlexLM hostid."
+}
+set version 2025.06
+set root /opt/synopsys/prime/X-2025.06
+module-whatis "Synopsys PrimeTime $version"
+prepend-path PATH $root/bin
+# FlexLM enumerates /sys through libudev while building the hostid; loading it
+# up front avoids the realloc() abort inside the container (pt/2025.06/Containerfile).
+prepend-path LD_PRELOAD /lib64/libudev.so.1

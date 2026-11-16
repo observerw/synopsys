@@ -1,0 +1,71 @@
+# Synopsys VC Static X-2025.06-SP2 (product vc_static, linux64), license
+# checked out from a remote SCL/FlexLM server.  The impl package is a companion
+# of the same release and installs into the vc_static tree, so both are
+# installed by one build.
+#
+# Both stages come from base/ (see base/Containerfile.build / .runtime):
+#   build:8.10   Synopsys Installer, ValidationTool, SI_ACCEPT_LICENSE=1
+#   runtime:8.10 X11/GL/libstdc++/FlexLM runtime libraries
+#
+# The vc_static and impl packages are delivered as .spf.partNN volumes;
+# batch_installer rebuilds each .spf through the Installer's joinEst.sh
+# (per-volume and joined-file MD5 verified).
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+ARG RUNTIME_IMAGE=${EDABASE}/runtime:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+COPY vc_static_vX-2025.06-SP2_common.spf.part* \
+     vc_static_vX-2025.06-SP2_linux64.spf.part* \
+     impl_vX-2025.06-SP2_common.spf.part* \
+     impl_vX-2025.06-SP2_linux64.spf.part* \
+     /tmp/src/
+
+RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
+        -target /opt/synopsys -install_as_root > /tmp/install.log 2>&1; \
+    rc=$?; tail -30 /tmp/install.log; echo "install_rc=$rc"; \
+    test -d /opt/synopsys/vc_static/X-2025.06-SP2
+
+RUN ValidationTool -a -d /opt/synopsys/vc_static/X-2025.06-SP2
+
+FROM ${RUNTIME_IMAGE}
+
+# VC Formal's embedded VCS reader shells out to bc, /usr/bin/time and the system
+# compiler while elaborating the design; runtime ships none of them, and
+# `elaborate` dies with "DB_COPT012: VCS reader failed" without them.
+RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
+        --setopt=install_weak_deps=False install \
+        bc time gcc gcc-c++ make \
+ && dnf clean all
+
+COPY --from=build /opt/synopsys/vc_static/X-2025.06-SP2 \
+     /opt/synopsys/vc_static/X-2025.06-SP2
+
+# The Qt/xcb copies bundled in the product tree are needed by every binary of
+# the flow (VC Formal's vcf and the VC Static shell alike); the demo used to
+# set both variables in its wrapper.  Keep them in the image so the entry point
+# below works on its own.
+ENV SYNOPSYS=/opt/synopsys \
+    VC_STATIC_HOME=/opt/synopsys/vc_static/X-2025.06-SP2 \
+    PATH=/opt/synopsys/vc_static/X-2025.06-SP2/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/synopsys/vc_static/X-2025.06-SP2/IMPL_COMPAT/LC/amd64/nwtn/shlib/qt:/opt/synopsys/vc_static/X-2025.06-SP2/IMPL_COMPAT/LC/amd64/nwtn/shlib/export:/opt/synopsys/vc_static/X-2025.06-SP2/linux64/vcst/lib/etc/lib/libxcb/LINUX64
+
+# --- start probe ----------------------------------------------------------
+# Run the packaged probe as the last build step, so a tree that cannot start
+# never reaches the registry.  /tmp and /root are tmpfs for this step: the
+# tools keep their command logs and license cache there and none of that
+# belongs in the image.  Re-run the probe against the finished image with
+#   nerdctl run --rm --entrypoint /opt/eda-smoke/smoke.sh <image>
+COPY smoke.sh /opt/eda-smoke/smoke.sh
+RUN --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/root \
+    chmod 0755 /opt/eda-smoke/smoke.sh \
+ && /opt/eda-smoke/smoke.sh
+
+# The image entry point is the tool itself: a pod without a command, or
+# `nerdctl run -it <image>`, lands in the vc_static_shell prompt, and extra
+# arguments are passed straight through (`nerdctl run --rm <image> -f run.tcl`).
+# Use `--entrypoint /bin/bash` (or `command: ["bash"]` in a pod) for a shell.
+WORKDIR /work
+ENTRYPOINT ["vc_static_shell"]
