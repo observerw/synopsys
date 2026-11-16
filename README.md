@@ -40,6 +40,12 @@ pass through, e.g. `nerdctl run --rm <image> -f run.tcl`. Use
 `--entrypoint /bin/bash` (or `command: ["bash"]`) for a shell; in the `synopsys`
 image the `CMD` starts the KasmVNC desktop.
 
+`local.io` is this cluster's private image registry, so it is a placeholder in
+this repository rather than a public address. If you reuse this layout, replace
+`local.io` with your own private registry host: it appears in the Containerfiles'
+`EDABASE` defaults, the `k8s/` manifests, the CI workflow and the skill examples,
+and the BuildKit push target in `docs/build.md`.
+
 | Product | Image | Entry point |
 | --- | --- | --- |
 | `base` | `synopsys/build:8.10`, `synopsys/runtime:8.10` | `bash` |
