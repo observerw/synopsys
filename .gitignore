@@ -35,5 +35,6 @@ ciel/_work/
 /ASAP7/asap7/
 /ASAP7/asap7_snps/
 
-# Vendored skill checkout (reproducible from skills-lock.json).
+# Vendored skill checkout (cluster/gitea skills); this repo's own skill lives
+# in skills/synopsys/.
 .agents/
