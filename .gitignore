@@ -1,7 +1,11 @@
 # Vendor payloads are not versioned: they stay in the working tree and the
 # image builds read them from there (see README "Payloads").
 #
-# Text sources (Containerfiles, scripts, licenses) are tracked normally.
+# Text sources (Containerfiles, scripts) are tracked normally.
+
+# Site license file: it belongs to the license server image, is dropped in by
+# hand, and is never versioned (the SSH keys inside are site-specific).
+scl/*/license.dat
 
 # Synopsys installer, validation tool and EST images.
 *.run
