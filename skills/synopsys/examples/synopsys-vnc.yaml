@@ -1,0 +1,65 @@
+# KasmVNC desktop with every Synopsys tool. Apply, then port-forward:
+#   kubectl -n synopsys apply -f synopsys-vnc.yaml
+#   kubectl -n synopsys port-forward svc/synopsys-vnc 6901:6901
+# Open https://127.0.0.1:6901/ and accept the self-signed certificate.
+# Change VNC_USER/VNC_PASSWORD before exposing the Service.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: synopsys-vnc
+  namespace: synopsys
+  labels:
+    app: synopsys-vnc
+spec:
+  restartPolicy: Always
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  containers:
+    - name: desktop
+      image: local.io/synopsys/synopsys:2025.06
+      # The tag is re-assembled in place when a tool image changes, so re-check
+      # it instead of trusting the node's cached copy.
+      imagePullPolicy: Always
+      ports:
+        - name: kasmvnc
+          containerPort: 6901
+          protocol: TCP
+      env:
+        - name: SNPSLMD_LICENSE_FILE
+          value: 2700@license
+        - name: LM_LICENSE_FILE
+          value: 2700@license
+        - name: VNC_USER
+          value: change-me
+        - name: VNC_PASSWORD
+          value: change-me
+      volumeMounts:
+        - name: data
+          mountPath: /data2
+      resources:
+        requests:
+          cpu: "4"
+          memory: 16Gi
+        limits:
+          cpu: "16"
+          memory: 64Gi
+  volumes:
+    - name: data
+      hostPath:
+        path: /data2
+        type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: synopsys-vnc
+  namespace: synopsys
+spec:
+  selector:
+    app: synopsys-vnc
+  ports:
+    - name: kasmvnc
+      port: 6901
+      targetPort: kasmvnc
+      protocol: TCP
+  type: ClusterIP

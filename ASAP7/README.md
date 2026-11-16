@@ -80,5 +80,5 @@ set target_library [glob /pdks/asap7sc7p5t_28/LIB/db/*_RVT_TT_*.db]
 set link_library   "* $target_library"
 ```
 
-A working example is in the `eda` skill:
-`skills/eda/examples/dc-asap7-job.yaml`.
+A working example is in the `synopsys` skill:
+`skills/synopsys/examples/dc-asap7-job.yaml`.

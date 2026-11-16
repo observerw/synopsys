@@ -20,6 +20,7 @@ therefore a sibling directory rather than an in-place rewrite.
 | `synopsys/2025.06/` | every tool + VIP + PDKs in one module-managed KasmVNC desktop image, assembled from the product images |
 | `ASAP7/` | ASAP7 PDK store tooling and the host-mounted `pdk/asap7` trees |
 | `docs/` | build, CI, runtime dependency and licensing details |
+| `skills/synopsys/` | agent skill for running the built images: jobs, licenses, PDKs, VIP and the desktop |
 | `.github/` | image build workflow and its product-selection script |
 
 ## Payloads

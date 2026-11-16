@@ -1,0 +1,45 @@
+# Replace /data2/<user>/<project> and run.tcl before submitting.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pt-demo
+  namespace: synopsys
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      schedulerName: kai-scheduler
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        supplementalGroups: [1003]
+      volumes:
+        - name: data2
+          hostPath:
+            path: /data2
+            type: Directory
+        - name: pdk
+          hostPath:
+            path: /data2/synopsys/pdk/sky130-dc
+            type: Directory
+      containers:
+        - name: pt
+          image: local.io/synopsys/pt:2025.06
+          env:
+            - name: SNPSLMD_LICENSE_FILE
+              value: 2700@license
+            - name: LM_LICENSE_FILE
+              value: 2700@license
+          command: ["pt_shell", "-f", "run.tcl"]
+          workingDir: /data2/<user>/<project>
+          resources:
+            requests:
+              cpu: "8"
+              memory: 32Gi
+          volumeMounts:
+            - name: data2
+              mountPath: /data2
+            - name: pdk
+              mountPath: /pdks
+              readOnly: true

@@ -1,0 +1,155 @@
+name: Run EDA Job
+
+# 仓库 checkout 先落到共享卷 ci-work；工具 Job 写同一个卷；
+# 跑完后由 synopsys 里的上传 Job 把结果传到 S3。凭据用 CI 里指定的 Secret。
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Job 名，如 dc-counter"
+        required: true
+      tcl:
+        description: "Tcl 脚本文件名"
+        required: false
+        default: run.tcl
+      s3_secret:
+        description: "synopsys 里存放 S3 凭据的 Secret 名"
+        required: true
+
+env:
+  JOB: ${{ inputs.name }}
+  TCL: ${{ inputs.tcl }}
+  S3_SECRET: ${{ inputs.s3_secret }}
+  S3_PREFIX: ${{ github.repository }}/${{ github.run_number }}
+
+jobs:
+  run:
+    runs-on: [ubuntu-latest, eda, cluster]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+
+      - name: Stage the checkout on ci-work
+        run: |
+          set -eu
+          RUN="/work/${GITHUB_REPOSITORY}/${GITHUB_RUN_NUMBER}"
+          mkdir -p "${RUN}"
+          cp -a "${GITHUB_WORKSPACE}"/. "${RUN}"/
+          chown -R 1001:1001 "${RUN}"
+          echo "RUN=${RUN}" >> "$GITHUB_ENV"
+
+      - name: Submit the tool Job
+        run: |
+          set -eu
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${JOB}
+            namespace: synopsys
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                schedulerName: kai-scheduler
+                restartPolicy: Never
+                securityContext:
+                  runAsUser: 1001
+                  runAsGroup: 1001
+                  supplementalGroups: [1003]
+                containers:
+                  - name: dc
+                    image: local.io/synopsys/dc:2025.06-SP4
+                    env:
+                      - name: SNPSLMD_LICENSE_FILE
+                        value: 2700@license
+                      - name: LM_LICENSE_FILE
+                        value: 2700@license
+                    command: ["dc_shell", "-f", "${RUN}/${TCL}"]
+                    workingDir: ${RUN}
+                    resources:
+                      requests:
+                        cpu: "8"
+                        memory: 32Gi
+                    volumeMounts:
+                      - name: work
+                        mountPath: /work
+                      - name: pdk
+                        mountPath: /pdks
+                        readOnly: true
+                volumes:
+                  - name: work
+                    persistentVolumeClaim:
+                      claimName: ci-work
+                  - name: pdk
+                    hostPath:
+                      path: /data2/synopsys/pdk/sky130-dc
+                      type: Directory
+          EOF
+
+      - name: Wait for the tool
+        run: kubectl -n synopsys wait --for=condition=complete "job/${JOB}" --timeout=150m
+
+      - name: Tool logs
+        run: kubectl -n synopsys logs "job/${JOB}"
+
+      - name: Submit the upload Job
+        run: |
+          set -eu
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${JOB}-upload
+            namespace: synopsys
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                schedulerName: kai-scheduler
+                restartPolicy: Never
+                containers:
+                  - name: upload
+                    image: amazon/aws-cli:2.39.4
+                    envFrom:
+                      - secretRef:
+                          name: ${S3_SECRET}
+                    env:
+                      - name: S3_ENDPOINT
+                        value: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+                      - name: RUN_DIR
+                        value: "${RUN}"
+                      - name: S3_PREFIX
+                        value: "${S3_PREFIX}"
+                    command: ["sh", "-c"]
+                    args:
+                      - |
+                        set -eu
+                        aws --endpoint-url "\${S3_ENDPOINT}" s3 cp "\${RUN_DIR}" \
+                          "s3://\${S3_BUCKET}/\${S3_PREFIX}/" --recursive
+                        rm -rf "\${RUN_DIR}"
+                    resources:
+                      requests:
+                        cpu: 100m
+                        memory: 256Mi
+                    volumeMounts:
+                      - name: work
+                        mountPath: /work
+                volumes:
+                  - name: work
+                    persistentVolumeClaim:
+                      claimName: ci-work
+          EOF
+
+      - name: Wait for the upload
+        run: kubectl -n synopsys wait --for=condition=complete "job/${JOB}-upload" --timeout=30m
+
+      - name: Upload logs
+        if: always()
+        run: kubectl -n synopsys logs "job/${JOB}-upload" || true
+
+      - name: Clean up
+        if: always()
+        run: |
+          kubectl -n synopsys delete job "${JOB}" "${JOB}-upload" --ignore-not-found
+          if [ -n "${RUN:-}" ]; then rm -rf "${RUN}"; fi
