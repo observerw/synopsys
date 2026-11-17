@@ -18,12 +18,34 @@ RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
 
 RUN ValidationTool -a -d /opt/synopsys/syn/U-2022.12-SP7-3
 
+# libpng12.so.0 for the runtime stage.  dc_shell runs linux64/syn/bin/
+# common_shell_exec, which links this el7 soname; AlmaLinux 8 ships libpng15
+# only and the tool tree does not carry a copy.  Unpack it from the CentOS 7
+# package that binary was linked against, into a private directory (the
+# wrapper keeps an existing LD_LIBRARY_PATH).
+RUN curl -fsSL -o /tmp/libpng12.rpm \
+        http://mirrors.cloud.tencent.com/centos-vault/7.9.2009/os/x86_64/Packages/libpng12-1.2.50-10.el7.x86_64.rpm \
+ && cd /tmp \
+ && rpm2cpio libpng12.rpm | cpio --quiet -id ./usr/lib64/libpng12.so.0.50.0 \
+ && mkdir -p /opt/synopsys-compat \
+ && mv usr/lib64/libpng12.so.0.50.0 /opt/synopsys-compat/libpng12.so.0
+
 FROM ${RUNTIME_IMAGE}
+
+# common_shell_exec also links the PulseAudio client libraries, which runtime
+# does not carry.  See docs/container-quirks.md.
+RUN dnf -y --disablerepo='*' --enablerepo=baseos,appstream \
+        --setopt=install_weak_deps=False install \
+        pulseaudio-libs pulseaudio-libs-glib2 \
+ && dnf clean all
+
+COPY --from=build /opt/synopsys-compat /opt/synopsys-compat
 
 COPY --from=build /opt/synopsys/syn/U-2022.12-SP7-3 /opt/synopsys/syn/U-2022.12-SP7-3
 
 ENV SYNOPSYS=/opt/synopsys \
-    PATH=/opt/synopsys/syn/U-2022.12-SP7-3/bin:$PATH
+    PATH=/opt/synopsys/syn/U-2022.12-SP7-3/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/synopsys-compat
 
 # Start probe last; tmpfs /tmp and /root keep its logs out of the image.
 COPY smoke.sh /opt/eda-smoke/smoke.sh
