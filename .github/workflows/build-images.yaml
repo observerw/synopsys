@@ -1,14 +1,16 @@
 name: Build EDA images
 
-# Builds the Synopsys tool images with the cluster build service and pushes them
-# to the cluster registry as
+# Builds the Synopsys tool images with a BuildKit service and pushes them to a
+# container registry as
 #
-#   local.io/synopsys/<product>:<version>
+#   <registry>/<namespace>/<product>:<version>
 #
-# e.g. local.io/synopsys/dc:2025.06-SP4.
+# Deployment values (registry and namespace, BuildKit endpoint and the payload
+# checkout) are repository variables; see docs/ci.md for the variable list.
 #
-# The vendor payloads are not in git; the job pods mount the cluster's /data2 and
-# build straight from the checkout, so the payloads have to be in place there.
+# The vendor payloads are not in git.  SOURCE_DIR is a checkout of the built
+# commit with those payloads staged next to the Containerfiles; the job pods
+# read and build from that directory.
 #
 # A push to main builds the images whose directory it touched (base/ rebuilds
 # the two bases and then every image that is built on them); the mapping lives
@@ -69,12 +71,14 @@ on:
         default: false
 
 env:
-  # Inside a job pod local.io resolves to a public host, so push to the Service.
-  REGISTRY: distribution-local.local-registry.svc.cluster.local:5000
-  NAMESPACE: synopsys
-  BUILDKIT_ADDR: tcp://buildkitd.buildkit.svc.cluster.local:1234
-  # The checkout lives on the cluster's shared GPFS, mounted into every job pod.
-  SOURCE_DIR: /data2/synopsys
+  # Deployment-specific values come from repository variables; keep this
+  # mapping and .github/scripts/ci-config.sh in sync.  No defaults here: an
+  # unset variable must fail the run rather than build against another
+  # registry or source tree.
+  REGISTRY: ${{ vars.REGISTRY }}
+  NAMESPACE: ${{ vars.NAMESPACE }}
+  BUILDKIT_ADDR: ${{ vars.BUILDKIT_ADDR }}
+  SOURCE_DIR: ${{ vars.SOURCE_DIR }}
   # Version label of the two open-PDK images.  Change it here and in the
   # manifests that reference the images (ciel/k8s/).
   CIEL_VERSION: "2026.11"
@@ -110,16 +114,18 @@ jobs:
         shell: sh
         run: |
           set -eu
-          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          sh "${source_dir}/.github/scripts/ci-config.sh"
+          decision=$(sh "${source_dir}/.github/scripts/select-products.sh" \
                           base '${{ matrix.watch }}' no)
           [ "${decision}" = yes ] || exit 0
 
-          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          dir="${source_dir}/${{ matrix.dir }}"
           [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
 
           # Payloads are untracked, so a dirty tree means the image would not
           # match the pushed or dispatched commit.
-          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+          dirt=$(git -c safe.directory="${source_dir}" -C "${source_dir}" \
                    status --porcelain -- "${{ matrix.dir }}")
           if [ -n "${dirt}" ]; then
             echo "uncommitted changes under ${{ matrix.dir }}:"
@@ -133,7 +139,8 @@ jobs:
         shell: sh
         run: |
           set -eu
-          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          dir="${source_dir}/${{ matrix.dir }}"
           image="${REGISTRY}/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
 
           # Cache is passed with --import-cache/--export-cache, not with the
@@ -164,7 +171,7 @@ jobs:
             --export-cache "type=registry,ref=${image}-cache,mode=min" \
             --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
 
-          echo "pushed local.io/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
+          echo "pushed ${image}"
 
   # One job per tool image; the matrix entry carries the version tag, so the
   # registry never gets a floating tag.
@@ -235,17 +242,19 @@ jobs:
         shell: sh
         run: |
           set -eu
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          sh "${source_dir}/.github/scripts/ci-config.sh"
           name='${{ matrix.name }}'
           basedeps='${{ matrix.basedeps }}'
           [ -n "${basedeps}" ] || basedeps=both
-          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+          decision=$(sh "${source_dir}/.github/scripts/select-products.sh" \
                           "${name}" '${{ matrix.dir }}' "${basedeps}")
           [ "${decision}" = yes ] || exit 0
 
-          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          dir="${source_dir}/${{ matrix.dir }}"
           [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
 
-          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+          dirt=$(git -c safe.directory="${source_dir}" -C "${source_dir}" \
                    status --porcelain -- "${{ matrix.dir }}")
           if [ -n "${dirt}" ]; then
             echo "uncommitted changes under ${{ matrix.dir }}:"
@@ -259,7 +268,8 @@ jobs:
         shell: sh
         run: |
           set -eu
-          dir="${SOURCE_DIR}/${{ matrix.dir }}"
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          dir="${source_dir}/${{ matrix.dir }}"
           image="${REGISTRY}/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
 
           # --import-cache/--export-cache rather than --opt cache-from/cache-to;
@@ -274,7 +284,7 @@ jobs:
             --export-cache "type=registry,ref=${image}-cache,mode=min" \
             --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
 
-          echo "pushed local.io/${NAMESPACE}/${{ matrix.name }}:${{ matrix.tag }}"
+          echo "pushed ${image}"
 
   # The open PDKs are not a product image: the context is the generated PDK_ROOT
   # tree, and Containerfile.pdk copies it into a scratch image that Kubernetes
@@ -289,11 +299,13 @@ jobs:
         shell: sh
         run: |
           set -eu
-          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          sh "${source_dir}/.github/scripts/ci-config.sh"
+          decision=$(sh "${source_dir}/.github/scripts/select-products.sh" \
                           ciel ciel no)
           [ "${decision}" = yes ] || exit 0
 
-          dir="${SOURCE_DIR}/ciel"
+          dir="${source_dir}/ciel"
           [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
           for ctx in pdk pdk-dc; do
             [ -d "${dir}/${ctx}" ] || {
@@ -302,7 +314,7 @@ jobs:
             }
           done
 
-          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+          dirt=$(git -c safe.directory="${source_dir}" -C "${source_dir}" \
                    status --porcelain -- ciel)
           if [ -n "${dirt}" ]; then
             echo "uncommitted changes under ciel:"
@@ -316,7 +328,8 @@ jobs:
         shell: sh
         run: |
           set -eu
-          dir="${SOURCE_DIR}/ciel"
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          dir="${source_dir}/ciel"
 
           # versions.json carries the family versions, asset URLs and the sha256
           # of every archive; the archives themselves are not in git. The only
@@ -338,7 +351,7 @@ jobs:
               --import-cache "type=registry,ref=${image}-cache" \
               --export-cache "type=registry,ref=${image}-cache,mode=min" \
               --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
-            echo "pushed local.io/${NAMESPACE}/${name}:${CIEL_VERSION}"
+            echo "pushed ${image}"
           done
 
   # VIP is a static file image, not a tool: the context is the payload
@@ -355,11 +368,13 @@ jobs:
         shell: sh
         run: |
           set -eu
-          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          sh "${source_dir}/.github/scripts/ci-config.sh"
+          decision=$(sh "${source_dir}/.github/scripts/select-products.sh" \
                           vip vip build)
           [ "${decision}" = yes ] || exit 0
 
-          dir="${SOURCE_DIR}/vip/2023.12"
+          dir="${source_dir}/vip/2023.12"
           [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
           for f in vip_library19_svt_V-2023.12.run \
                    vip_ecpri_svt_V-2023.12.run \
@@ -367,7 +382,7 @@ jobs:
             [ -f "${dir}/${f}" ] || { echo "missing payload: ${dir}/${f}"; exit 1; }
           done
 
-          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+          dirt=$(git -c safe.directory="${source_dir}" -C "${source_dir}" \
                    status --porcelain -- vip)
           if [ -n "${dirt}" ]; then
             echo "uncommitted changes under vip:"
@@ -381,7 +396,8 @@ jobs:
         shell: sh
         run: |
           set -eu
-          dir="${SOURCE_DIR}/vip/2023.12"
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          dir="${source_dir}/vip/2023.12"
           image="${REGISTRY}/${NAMESPACE}/vip:2023.12"
 
           buildctl --addr "${BUILDKIT_ADDR}" build \
@@ -394,7 +410,7 @@ jobs:
             --export-cache "type=registry,ref=${image}-cache,mode=min" \
             --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
 
-          echo "pushed local.io/${NAMESPACE}/vip:2023.12"
+          echo "pushed ${image}"
 
   # The all-in-one image is assembled from the images above: every tool tree is
   # copied out of the image that already installed and patched it, VIP out of
@@ -413,24 +429,26 @@ jobs:
         shell: sh
         run: |
           set -eu
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          sh "${source_dir}/.github/scripts/ci-config.sh"
           # A change anywhere in the source images changes what this image is
           # assembled from, so they all count as dependencies.  These are the
           # exact build contexts named in this Containerfile's FROM lines: an
           # older release kept next to one of them (vcs/2023.12-SP2, ...) is a
           # standalone product image and must not rebuild this one.
           deps='vcs/2025.06-SP1:verdi/2025.06-SP1:lc/2025.06:spyglass/2025.06:fm/2025.06:pt/2025.06:dc/2025.06-SP4:fc/2025.06:vcst/2025.06-SP2:vip:ciel'
-          decision=$(sh "${SOURCE_DIR}/.github/scripts/select-products.sh" \
+          decision=$(sh "${source_dir}/.github/scripts/select-products.sh" \
                           synopsys synopsys runtime "${deps}")
           [ "${decision}" = yes ] || exit 0
 
-          dir="${SOURCE_DIR}/synopsys/2025.06"
+          dir="${source_dir}/synopsys/2025.06"
           [ -d "${dir}" ] || { echo "missing source directory: ${dir}"; exit 1; }
 
           # Everything else comes out of a source image.
           ls "${dir}"/kasmvnc/*.rpm >/dev/null 2>&1 || {
             echo "missing KasmVNC RPM in ${dir}/kasmvnc; run synopsys/2025.06/fetch-kasmvnc.sh"; exit 1; }
 
-          dirt=$(git -c safe.directory="${SOURCE_DIR}" -C "${SOURCE_DIR}" \
+          dirt=$(git -c safe.directory="${source_dir}" -C "${source_dir}" \
                    status --porcelain -- synopsys)
           if [ -n "${dirt}" ]; then
             echo "uncommitted changes under synopsys:"
@@ -444,7 +462,8 @@ jobs:
         shell: sh
         run: |
           set -eu
-          dir="${SOURCE_DIR}/synopsys/2025.06"
+          source_dir=${SOURCE_DIR:?repository variable SOURCE_DIR is not set}
+          dir="${source_dir}/synopsys/2025.06"
           image="${REGISTRY}/${NAMESPACE}/synopsys:2025.06"
 
           # EDABASE is the prefix of every source image in the Containerfile and
@@ -460,4 +479,4 @@ jobs:
             --export-cache "type=registry,ref=${image}-cache,mode=min" \
             --output "type=image,name=${image},push=true,compression=zstd,oci-mediatypes=true"
 
-          echo "pushed local.io/${NAMESPACE}/synopsys:2025.06"
+          echo "pushed ${image}"

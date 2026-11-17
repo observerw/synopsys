@@ -1,17 +1,34 @@
 # CI
 
-`.github/workflows/build-images.yaml` builds the images with the cluster's
-BuildKit service and pushes them to the cluster registry. **Images are built by
-CI only — do not build them by hand.**
+`.github/workflows/build-images.yaml` builds the images with the BuildKit
+service and pushes them to a container registry. **Images are built by CI only —
+do not build them by hand.**
 
-The workflow is plain GitHub Actions: no marketplace actions, no `secrets`, and
-the only contexts it reads (`github.*`, `inputs.*`, `github.event.before`) are
-implemented by both, and Gitea falls back to `.github/workflows` when there is
-no `.gitea/workflows`. What does not travel is the environment: the jobs need a
-runner with `/data2/synopsys` mounted, the buildkit Service and the cluster
-registry, so they only run on the cluster's Gitea runner.
+The workflow is plain GitHub Actions syntax: no marketplace actions, no
+`secrets`, and the only contexts it reads (`github.*`, `inputs.*`,
+`vars.*`, `github.event.before`) are implemented by both, and Gitea falls back
+to `.github/workflows` when there is no `.gitea/workflows`. The values a
+deployment must supply — registry and namespace, BuildKit endpoint and payload
+checkout — are repository variables; the runner and BuildKit client image are
+part of the workflow.
 
-## What a push rebuilds
+## Repository variables
+
+Set these in *Settings → Actions → Variables* (or `gt variable set`) before the
+first run:
+
+| Variable | Meaning |
+| --- | --- |
+| `BUILDKIT_ADDR` | BuildKit endpoint, e.g. `tcp://buildkitd:1234` |
+| `REGISTRY` | registry endpoint the images are pushed to |
+| `NAMESPACE` | image path under that registry |
+| `SOURCE_DIR` | absolute path of a git checkout of the built commit with the untracked vendor payloads staged in it |
+
+`SOURCE_DIR` is checked by
+[`.github/scripts/ci-config.sh`](../.github/scripts/ci-config.sh) on every job:
+it must be a git checkout whose `HEAD` is the commit being built. A missing
+variable or a stale checkout fails the run before anything is built. The
+workflow does not fall back to the workspace, `/data2` or any other path.
 
 A push to `main` builds the images whose sources it touched:
 
@@ -48,8 +65,8 @@ registry, which is what the assembly consumes.
 Dispatch *Actions → Build EDA images* to rebuild an image whose sources did not
 change (pick a product, or `all` for the two bases followed by every tool):
 
-- the job pods read `/data2/synopsys` directly, so the payloads have to be in
-  place on that GPFS mount before the run (`synopsys/2025.06/` needs only
+- the job pods read `SOURCE_DIR` directly, so the payloads have to be in
+  place on that checkout before the run (`synopsys/2025.06/` needs only
   `synopsys/2025.06/fetch-kasmvnc.sh` for the KasmVNC RPM);
 - the build refuses to run if the tracked files of the selected product differ
   from the pushed/dispatched commit (`allow_dirty` overrides that on dispatch);

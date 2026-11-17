@@ -71,7 +71,9 @@ No image sets a license server address: jobs pass `SNPSLMD_LICENSE_FILE` and
 Images are built and pushed by CI on the cluster's Gitea runner. **Do not build
 them by hand.** A push to `main` rebuilds only the images whose sources changed;
 to rebuild anything else, dispatch *Actions → Build EDA images* from the
-workflow (choose a product or `all`).
+workflow (choose a product or `all`). The registry, BuildKit endpoint and
+payload checkout are repository variables, not values in the workflow; see
+[`docs/ci.md`](docs/ci.md).
 
 Every tool image ends with its own start probe, so an image that cannot start
 the tool fails before it is pushed. See
