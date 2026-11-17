@@ -12,7 +12,7 @@ description: "Use this skill when running Synopsys EDA jobs on the gpu cluster: 
 | `local.io/synopsys/synopsys:2025.06` | all tools, VIP, open PDKs and a KasmVNC desktop | `eda-vnc` |
 | `local.io/synopsys/vcs:2025.06-SP1`, `:2023.12-SP2` | VCS | `vcs` |
 | `local.io/synopsys/verdi:2025.06-SP1`, `:2023.12-SP2` | Verdi | `verdi` |
-| `local.io/synopsys/dc:2025.06-SP4` | Design Compiler | `dc_shell` |
+| `local.io/synopsys/dc:2025.06-SP4`, `:2022.12-SP7-3` | Design Compiler | `dc_shell` |
 | `local.io/synopsys/fc:2025.06` | Fusion Compiler | `fc_shell` |
 | `local.io/synopsys/pt:2025.06` | PrimeTime | `pt_shell` |
 | `local.io/synopsys/fm:2025.06` | Formality | `fm_shell` |

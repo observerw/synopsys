@@ -1,0 +1,36 @@
+# Synopsys Design Compiler U-2022.12-SP7-3 (product syn, linux64), license
+# checked out from a remote SCL/FlexLM server.
+ARG EDABASE=local.io/synopsys
+ARG BUILD_IMAGE=${EDABASE}/build:8.10
+ARG RUNTIME_IMAGE=${EDABASE}/runtime:8.10
+
+FROM ${BUILD_IMAGE} AS build
+
+COPY syn_vU-2022.12-SP7-3_linux64.spf \
+     syn_vU-2022.12-SP7-3_common.spf.part* \
+     /tmp/src/
+
+# syn ships an interactive-only post-install step; gate on the installed tree.
+RUN /opt/synopsys-installer/batch_installer -allprods -source /tmp/src \
+        -target /opt/synopsys -install_as_root > /tmp/install.log 2>&1; \
+    rc=$?; tail -30 /tmp/install.log; echo "install_rc=$rc"; \
+    test -d /opt/synopsys/syn/U-2022.12-SP7-3
+
+RUN ValidationTool -a -d /opt/synopsys/syn/U-2022.12-SP7-3
+
+FROM ${RUNTIME_IMAGE}
+
+COPY --from=build /opt/synopsys/syn/U-2022.12-SP7-3 /opt/synopsys/syn/U-2022.12-SP7-3
+
+ENV SYNOPSYS=/opt/synopsys \
+    PATH=/opt/synopsys/syn/U-2022.12-SP7-3/bin:$PATH
+
+# Start probe last; tmpfs /tmp and /root keep its logs out of the image.
+COPY smoke.sh /opt/eda-smoke/smoke.sh
+RUN --mount=type=tmpfs,target=/tmp \
+    --mount=type=tmpfs,target=/root \
+    chmod 0755 /opt/eda-smoke/smoke.sh \
+ && /opt/eda-smoke/smoke.sh
+
+WORKDIR /work
+ENTRYPOINT ["dc_shell"]

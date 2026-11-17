@@ -229,6 +229,13 @@ jobs:
             tag: "2025.06-SP4"
             dir: dc/2025.06-SP4
             file: dc/2025.06-SP4/Containerfile
+          # Older release of the same product: a separate tag, so a push to
+          # either version directory only rebuilds that one (dispatch of dc
+          # rebuilds both).  The assembled synopsys image stays on 2025.06-SP4.
+          - name: dc
+            tag: "2022.12-SP7-3"
+            dir: dc/2022.12-SP7-3
+            file: dc/2022.12-SP7-3/Containerfile
           - name: fc
             tag: "2025.06"
             dir: fc/2025.06

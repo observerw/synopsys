@@ -21,7 +21,7 @@ version, so a new release is a new tag.
 | all tools + desktop | `synopsys/synopsys:2025.06` | `eda-vnc` |
 | VCS | `synopsys/vcs:2025.06-SP1`, `:2023.12-SP2` | `vcs` |
 | Verdi | `synopsys/verdi:2025.06-SP1`, `:2023.12-SP2` | `verdi` |
-| Design Compiler | `synopsys/dc:2025.06-SP4` | `dc_shell` |
+| Design Compiler | `synopsys/dc:2025.06-SP4`, `:2022.12-SP7-3` | `dc_shell` |
 | Fusion Compiler | `synopsys/fc:2025.06` | `fc_shell` |
 | PrimeTime | `synopsys/pt:2025.06` | `pt_shell` |
 | Formality | `synopsys/fm:2025.06` | `fm_shell` |

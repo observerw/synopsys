@@ -14,6 +14,7 @@ node's cached copy.
 | `local.io/synopsys/verdi:2025.06-SP1` | X-2025.06-SP1 | Verdi; `verdi` |
 | `local.io/synopsys/verdi:2023.12-SP2` | X-2023.12-SP2 | Verdi; `verdi` |
 | `local.io/synopsys/dc:2025.06-SP4` | X-2025.06-SP4 | Design Compiler; `dc_shell` |
+| `local.io/synopsys/dc:2022.12-SP7-3` | U-2022.12-SP7-3 | Design Compiler; `dc_shell` |
 | `local.io/synopsys/fc:2025.06` | X-2025.06 | Fusion Compiler; `fc_shell` |
 | `local.io/synopsys/pt:2025.06` | X-2025.06 | PrimeTime; `pt_shell` |
 | `local.io/synopsys/fm:2025.06` | X-2025.06 | Formality; `fm_shell` |

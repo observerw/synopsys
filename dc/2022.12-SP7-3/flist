@@ -1,0 +1,6 @@
+Containerfile
+.dockerignore
+smoke.sh
+syn_vU-2022.12-SP7-3_linux64.spf
+syn_vU-2022.12-SP7-3_common.spf.part00
+syn_vU-2022.12-SP7-3_common.spf.part01
